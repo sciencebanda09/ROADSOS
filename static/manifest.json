@@ -1,0 +1,34 @@
+{
+  "name": "ROADSOS – Emergency Response",
+  "short_name": "ROADSOS",
+  "description": "Road accident emergency services locator with AI guidance",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050709",
+  "theme_color": "#ff1744",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='40' fill='%23ff1744'/><text y='140' x='50%' dominant-baseline='middle' text-anchor='middle' font-size='120' font-family='Arial'>🆘</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["medical", "utilities", "navigation"],
+  "shortcuts": [
+    {
+      "name": "SOS Emergency",
+      "short_name": "SOS",
+      "description": "Open emergency services directly",
+      "url": "/?sos=1",
+      "icons": [{"src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><text y='76' x='50%' dominant-baseline='middle' text-anchor='middle' font-size='80'>🆘</text></svg>", "sizes": "96x96"}]
+    },
+    {
+      "name": "First Aid Guide",
+      "short_name": "First Aid",
+      "description": "Offline first aid quick guide",
+      "url": "/?tab=firstaid",
+      "icons": [{"src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><text y='76' x='50%' dominant-baseline='middle' text-anchor='middle' font-size='80'>🩹</text></svg>", "sizes": "96x96"}]
+    }
+  ]
+}

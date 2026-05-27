@@ -1,0 +1,2284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+  <title>ROADSOS v3 – Emergency Response</title>
+  <link rel="manifest" href="/static/manifest.json"/>
+  <meta name="theme-color" content="#050709"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root {
+      --void: #030507;
+      --base: #080c12;
+      --surface: #0d1219;
+      --card: #111822;
+      --card2: #16202e;
+      --border: #1c2a3e;
+      --border2: #243347;
+
+      --red: #ff2d55;
+      --red-dim: rgba(255,45,85,.18);
+      --red-glow: rgba(255,45,85,.45);
+      --amber: #ff9f0a;
+      --amber-dim: rgba(255,159,10,.16);
+      --cyan: #32d2ff;
+      --cyan-dim: rgba(50,210,255,.12);
+      --green: #30d158;
+      --green-dim: rgba(48,209,88,.12);
+      --purple: #bf5af2;
+      --gold: #ffd60a;
+      --gold-dim: rgba(255,214,10,.15);
+
+      --text: #f0f4ff;
+      --muted: #6e8aaa;
+      --faint: #324560;
+
+      --font-display: 'Bebas Neue', sans-serif;
+      --font: 'Space Grotesk', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      --r: 14px;
+      --r-sm: 9px;
+      --r-lg: 22px;
+      --sheet-h: 54vh;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%; width: 100%;
+      background: var(--void); color: var(--text);
+      font-family: var(--font);
+      overflow: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+    button { font-family: var(--font); cursor: pointer; border: none; background: none; }
+    input, select, textarea { font-family: var(--font); }
+    ::-webkit-scrollbar { width: 3px; height: 3px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+    #app { display: flex; flex-direction: column; height: 100dvh; position: relative; overflow: hidden; }
+
+    #map {
+      position: absolute; inset: 0;
+      z-index: 0;
+    }
+    .leaflet-tile-pane { filter: saturate(0.5) brightness(0.6); }
+    .leaflet-control-zoom { border: 1px solid var(--border2) !important; border-radius: var(--r-sm) !important; overflow: hidden; }
+    .leaflet-control-zoom a { background: var(--card) !important; color: var(--text) !important; border: none !important; border-bottom: 1px solid var(--border) !important; width: 34px !important; height: 34px !important; line-height: 34px !important; }
+    .leaflet-control-zoom a:hover { background: var(--card2) !important; }
+    .leaflet-control-attribution { display: none !important; }
+    .leaflet-popup-content-wrapper { background: var(--card2); color: var(--text); border: 1px solid var(--border2); border-radius: var(--r); box-shadow: 0 8px 32px rgba(0,0,0,.6); }
+    .leaflet-popup-tip { background: var(--card2); }
+    .leaflet-popup-content { margin: 14px 16px; font-family: var(--font); font-size: .82rem; }
+
+    #topbar {
+      position: absolute; top: 0; left: 0; right: 0; z-index: 400;
+      height: 58px;
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 14px;
+      background: linear-gradient(to bottom, rgba(5,7,9,.95) 0%, rgba(5,7,9,.0) 100%);
+      backdrop-filter: blur(2px);
+    }
+    .logo {
+      font-family: var(--font-display);
+      font-size: 1.9rem;
+      letter-spacing: 3px;
+      color: var(--red);
+      line-height: 1;
+      user-select: none;
+      text-shadow: 0 0 20px var(--red-glow);
+    }
+    .logo em { color: var(--text); font-style: normal; }
+    .v-badge {
+      font-size: .55rem; color: var(--faint);
+      font-family: var(--font-mono);
+      letter-spacing: 1px;
+      align-self: flex-end;
+      margin-bottom: 4px;
+    }
+    #loc-display {
+      flex: 1;
+      font-size: .72rem;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      letter-spacing: .3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: center;
+      cursor: pointer;
+      transition: color .2s;
+    }
+    #loc-display:hover { color: var(--cyan); }
+    #loc-display.located { color: var(--cyan); }
+    #net-badge {
+      font-size: .6rem; font-family: var(--font-mono); letter-spacing: .5px;
+      padding: 3px 10px; border-radius: 20px;
+      background: var(--card); color: var(--muted);
+      border: 1px solid var(--border);
+      transition: all .3s;
+      white-space: nowrap;
+    }
+    #net-badge.online  { background: var(--green-dim); color: var(--green);   border-color: rgba(105,240,174,.3); }
+    #net-badge.offline { background: var(--amber-dim); color: var(--amber);   border-color: rgba(255,145,0,.3); }
+    #medid-topbtn {
+      background: var(--card); border: 1px solid var(--border2);
+      color: var(--cyan); font-size: .68rem; font-weight: 600;
+      padding: 6px 11px; border-radius: 8px;
+      letter-spacing: .4px;
+      white-space: nowrap;
+      transition: all .15s;
+    }
+    #medid-topbtn:hover { background: var(--cyan-dim); border-color: var(--cyan); }
+
+    #golden-widget {
+      position: absolute; top: 68px; right: 14px; z-index: 400;
+      display: none;
+    }
+    #golden-widget.active { display: block; }
+    .golden-ring-wrap {
+      position: relative; width: 90px; height: 90px;
+      cursor: pointer;
+    }
+    .golden-ring-wrap svg { transform: rotate(-90deg); }
+    .ring-bg { fill: none; stroke: var(--gold-dim); stroke-width: 5; }
+    .ring-fill {
+      fill: none; stroke: var(--gold); stroke-width: 5;
+      stroke-dasharray: 251.2;
+      stroke-dashoffset: 0;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1s linear, stroke .5s;
+      filter: drop-shadow(0 0 6px var(--gold));
+    }
+    .ring-fill.critical { stroke: var(--red); filter: drop-shadow(0 0 8px var(--red)); animation: ring-pulse .8s ease-in-out infinite; }
+    @keyframes ring-pulse { 0%,100%{ opacity:1; } 50%{ opacity:.5; } }
+    .golden-center {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      pointer-events: none;
+    }
+    .golden-time {
+      font-family: var(--font-mono);
+      font-size: .82rem;
+      font-weight: 600;
+      color: var(--gold);
+      line-height: 1;
+    }
+    .golden-time.critical { color: var(--red); }
+    .golden-label {
+      font-size: .42rem;
+      font-family: var(--font-display);
+      letter-spacing: 1px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    #crash-overlay {
+      position: fixed; inset: 0; z-index: 2000;
+      background: rgba(5,7,9,.97);
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      backdrop-filter: blur(12px);
+    }
+    #crash-overlay.show { display: flex; }
+    .crash-pulse {
+      width: 120px; height: 120px; border-radius: 50%;
+      background: var(--red-dim);
+      border: 2px solid var(--red);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 3rem;
+      animation: crash-ring 1s ease-in-out infinite;
+      margin-bottom: 24px;
+    }
+    @keyframes crash-ring {
+      0%,100% { box-shadow: 0 0 0 0 var(--red-glow); }
+      50% { box-shadow: 0 0 0 30px rgba(255,23,68,0); }
+    }
+    .crash-title {
+      font-family: var(--font-display);
+      font-size: 2.6rem; letter-spacing: 4px;
+      color: var(--red);
+      text-shadow: 0 0 30px var(--red-glow);
+      margin-bottom: 8px;
+    }
+    .crash-sub { font-size: .88rem; color: var(--muted); margin-bottom: 32px; text-align: center; line-height: 1.5; }
+    .crash-countdown-ring {
+      position: relative; width: 80px; height: 80px; margin-bottom: 32px;
+    }
+    .crash-countdown-ring svg { transform: rotate(-90deg); }
+    #crash-ring-fill {
+      fill: none; stroke: var(--red); stroke-width: 6;
+      stroke-dasharray: 220;
+      stroke-dashoffset: 0;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1s linear;
+    }
+    #crash-count-display {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-display);
+      font-size: 2.2rem;
+      color: var(--red);
+    }
+    .crash-actions { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+    #cancel-crash {
+      background: var(--card); color: var(--green); border: 2px solid var(--green);
+      padding: 14px 32px; border-radius: var(--r); font-size: 1rem; font-weight: 700;
+      letter-spacing: 1px;
+      transition: all .15s;
+    }
+    #cancel-crash:hover { background: var(--green-dim); }
+    #confirm-crash {
+      background: var(--red); color: #fff;
+      padding: 14px 32px; border-radius: var(--r); font-size: 1rem; font-weight: 700;
+      letter-spacing: 1px;
+      box-shadow: 0 0 20px var(--red-glow);
+      transition: all .15s;
+    }
+    #confirm-crash:hover { background: #ff4569; }
+
+    #bottom-sheet {
+      position: absolute; bottom: 0; left: 0; right: 0; z-index: 300;
+      background: var(--base);
+      border-top: 1.5px solid var(--border2);
+      border-radius: 24px 24px 0 0;
+      display: flex; flex-direction: column;
+      height: var(--sheet-h);
+      box-shadow: 0 -12px 50px rgba(0,0,0,.7), 0 -1px 0 rgba(255,255,255,.03);
+      transition: height .38s cubic-bezier(.4,0,.2,1);
+    }
+    #bottom-sheet.expanded { height: 92vh; }
+    .sheet-handle-wrap {
+      display: flex; justify-content: center; align-items: center;
+      padding: 10px 0 6px;
+      cursor: pointer; flex-shrink: 0;
+    }
+    .sheet-handle {
+      width: 40px; height: 4px;
+      background: var(--border2);
+      border-radius: 2px;
+    }
+
+    .panic-lang-row {
+      display: flex; gap: 6px; padding: 0 14px 8px; flex-wrap: wrap; flex-shrink: 0;
+    }
+    .panic-lang-btn {
+      font-size: .65rem; font-weight: 700; padding: 4px 11px; border-radius: 20px;
+      border: 1px solid var(--border2); background: var(--card); color: var(--muted);
+      cursor: pointer; transition: all .15s; font-family: var(--font);
+      letter-spacing: .3px;
+    }
+    .panic-lang-btn.active {
+      background: var(--red-dim); color: var(--red); border-color: var(--red);
+    }
+
+    /* ── 2×2 emergency call grid ── */
+    .panic-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 8px; padding: 0 14px 8px; flex-shrink: 0;
+    }
+    .panic-btn {
+      border-radius: 14px; padding: 14px 10px;
+      border: none; cursor: pointer;
+      display: flex; flex-direction: column; align-items: center; gap: 5px;
+      transition: transform .12s, opacity .12s;
+      min-height: 84px; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .panic-btn:active { transform: scale(.94); opacity: .85; }
+    .panic-btn .pb-icon { font-size: 1.6rem; line-height: 1; }
+    .panic-btn .pb-label { font-size: .8rem; font-weight: 700; text-align: center; line-height: 1.2; }
+    .panic-btn .pb-num  { font-size: 1.05rem; font-weight: 900; letter-spacing: 1px; margin-top: 2px; }
+    .panic-btn .pb-tap  { font-size: .6rem; font-weight: 700; opacity: .7; letter-spacing: .3px; }
+    .pb-ambulance { background: rgba(255,45,85,.16); color: #ff6b8a; border: 1.5px solid rgba(255,45,85,.3); }
+    .pb-police    { background: rgba(50,210,255,.12); color: #5dd9ff; border: 1.5px solid rgba(50,210,255,.25); }
+    .pb-fire      { background: rgba(255,159,10,.14); color: #ffb830; border: 1.5px solid rgba(255,159,10,.3); }
+    .pb-hospital  { background: rgba(48,209,88,.13); color: #4ddb78; border: 1.5px solid rgba(48,209,88,.25); }
+
+    .panic-share {
+      margin: 0 14px 6px; border: none;
+      background: rgba(213,0,249,.12); color: var(--purple);
+      border-radius: 14px; padding: 13px;
+      cursor: pointer; font-family: var(--font);
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      font-size: .82rem; font-weight: 700; flex-shrink: 0;
+      transition: opacity .15s, transform .12s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .panic-share:active { transform: scale(.97); opacity: .85; }
+    .panic-share .ps-icon { font-size: 1.1rem; }
+
+    .panic-secondary {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 8px; padding: 0 14px 4px; flex-shrink: 0;
+    }
+    .panic-sec-btn {
+      background: var(--card); border: 1px solid var(--border2);
+      border-radius: 10px; padding: 10px;
+      cursor: pointer; font-family: var(--font);
+      display: flex; align-items: center; gap: 7px;
+      font-size: .68rem; font-weight: 700; color: var(--muted);
+      transition: background .13s;
+    }
+    .panic-sec-btn:hover { background: var(--card2); }
+    .panic-sec-btn .ps2-icon { font-size: 1.1rem; }
+
+    .panic-better-row {
+      display: flex; justify-content: center; padding: 2px 14px 6px; flex-shrink: 0;
+    }
+    .panic-better-link {
+      font-size: .62rem; color: var(--faint); background: none; border: none;
+      cursor: pointer; text-decoration: underline; font-family: var(--font);
+      font-weight: 600; letter-spacing: .2px;
+    }
+    .panic-better-link:hover { color: var(--muted); }
+
+    .qa-icon { font-size: 1.5rem; line-height: 1; }
+    .qa-label { font-size: .58rem; font-weight: 700; letter-spacing: .8px; color: var(--muted); text-transform: uppercase; }
+
+    /* ── Sheet Tabs ── */
+    .sheet-tabs {
+      display: flex; border-bottom: 1px solid var(--border);
+      flex-shrink: 0; padding: 0 14px; gap: 4px;
+    }
+    .stab {
+      flex: 1; padding: 9px 4px;
+      font-size: .68rem; font-weight: 600; letter-spacing: .6px;
+      color: var(--muted); text-align: center; text-transform: uppercase;
+      border-bottom: 2px solid transparent;
+      transition: all .2s;
+    }
+    .stab.active { color: var(--text); border-bottom-color: var(--red); }
+    .stab:hover:not(.active) { color: var(--text); }
+
+    .sheet-pane { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+    .sheet-pane.active { display: flex; }
+
+    #pane-search { gap: 0; }
+    .search-controls {
+      padding: 10px 14px; border-bottom: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 8px;
+      flex-shrink: 0;
+    }
+    .ctrl-row { display: flex; gap: 8px; align-items: center; }
+    .field {
+      flex: 1; background: var(--card); border: 1px solid var(--border2);
+      border-radius: var(--r-sm); color: var(--text); padding: 9px 12px;
+      font-size: .8rem; outline: none;
+      transition: border-color .2s;
+    }
+    .field:focus { border-color: var(--cyan); }
+    .field::placeholder { color: var(--faint); }
+    .icon-btn {
+      background: var(--card); border: 1px solid var(--border2);
+      color: var(--text); border-radius: var(--r-sm); padding: 8px 12px;
+      font-size: .88rem; transition: all .15s; white-space: nowrap;
+    }
+    .icon-btn:hover { background: var(--card2); border-color: var(--border); }
+    .radius-row { display: flex; align-items: center; gap: 8px; }
+    .radius-row input[type=range] { flex: 1; accent-color: var(--red); cursor: pointer; }
+    .radius-val { font-size: .78rem; color: var(--text); font-family: var(--font-mono); min-width: 44px; text-align: right; font-weight: 600; }
+    .cat-chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+    .cat-chips::-webkit-scrollbar { height: 2px; }
+    .chip {
+      flex-shrink: 0; padding: 5px 12px; border-radius: 20px;
+      font-size: .68rem; font-weight: 600; cursor: pointer;
+      border: 1.5px solid transparent; transition: all .15s;
+      user-select: none;
+    }
+    .chip.active { color: #fff; }
+    .chip:not(.active) { background: var(--card); color: var(--muted); border-color: var(--border); }
+    #search-btn {
+      width: 100%; background: var(--red); color: #fff;
+      border-radius: var(--r-sm); padding: 11px;
+      font-size: .88rem; font-weight: 700; letter-spacing: .5px;
+      transition: background .15s;
+    }
+    #search-btn:hover { background: #ff4569; }
+    #search-btn:disabled { background: var(--faint); cursor: not-allowed; }
+
+    /* Results */
+    #results-area { flex: 1; overflow-y: auto; padding: 6px 0; }
+    .empty-state { padding: 32px 20px; text-align: center; color: var(--muted); }
+    .empty-icon { font-size: 2.4rem; margin-bottom: 10px; }
+    .empty-state p { font-size: .78rem; line-height: 1.7; }
+
+    .cat-group { margin-bottom: 2px; }
+    .cat-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 14px; font-size: .75rem; font-weight: 600;
+      cursor: pointer; border-left: 3px solid transparent;
+      transition: background .12s;
+    }
+    .cat-header:hover { background: rgba(255,255,255,.03); }
+    .cat-count {
+      margin-left: auto; background: var(--card);
+      font-size: .62rem; padding: 1px 7px; border-radius: 10px; color: var(--muted);
+      font-family: var(--font-mono);
+    }
+    .src-badge { font-size: .58rem; padding: 2px 6px; border-radius: 10px; font-family: var(--font-mono); }
+    .src-live    { background: var(--green-dim); color: var(--green); }
+    .src-cache   { background: var(--cyan-dim);  color: var(--cyan); }
+    .src-offline { background: var(--amber-dim); color: var(--amber); }
+
+    .svc-list { display: none; }
+    .svc-list.open { display: block; }
+    .svc-card {
+      margin: 3px 10px; background: var(--card);
+      border-radius: var(--r-sm); padding: 11px 13px;
+      cursor: pointer; border: 1px solid transparent;
+      transition: all .15s;
+    }
+    .svc-card:hover { border-color: var(--border2); background: var(--card2); }
+    .svc-card.selected { border-color: var(--red); }
+    .svc-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+    .svc-name { font-size: .82rem; font-weight: 600; flex: 1; }
+    .svc-dist {
+      font-size: .7rem; font-family: var(--font-mono); font-weight: 600;
+      padding: 2px 8px; border-radius: 8px; white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .svc-dist.near { background: var(--green-dim); color: var(--green); }
+    .svc-dist.mid  { background: var(--amber-dim); color: var(--amber); }
+    .svc-dist.far  { background: var(--red-dim);   color: var(--red); }
+    .svc-addr { font-size: .67rem; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+    .svc-actions { display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap; }
+    .svc-btn {
+      font-size: .66rem; padding: 5px 11px; border-radius: 6px;
+      font-weight: 600; transition: all .15s; letter-spacing: .3px;
+      border: 1px solid;
+    }
+    .svc-btn.call { color: var(--cyan);  border-color: rgba(0,229,255,.4);  background: transparent; }
+    .svc-btn.call:hover  { background: var(--cyan-dim); }
+    .svc-btn.nav  { color: var(--green); border-color: rgba(105,240,174,.4); background: transparent; }
+    .svc-btn.nav:hover   { background: var(--green-dim); }
+    .svc-btn.share { color: var(--muted); border-color: var(--border2); background: transparent; }
+    .svc-btn.share:hover { background: var(--card2); }
+
+    #results-summary {
+      padding: 6px 14px; font-size: .65rem; color: var(--faint);
+      border-top: 1px solid var(--border); text-align: center;
+      font-family: var(--font-mono); flex-shrink: 0;
+    }
+
+    #pane-firstaid { overflow: hidden; }
+    .fa-scroll { flex: 1; overflow-y: auto; padding: 10px 12px; }
+    .fa-header { padding: 0 2px 8px; }
+    .fa-title { font-size: .75rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+    .offline-ok {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: var(--green-dim); color: var(--green);
+      font-size: .58rem; font-weight: 700; letter-spacing: .8px;
+      padding: 3px 10px; border-radius: 10px;
+      margin-left: 8px;
+    }
+    .inj-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .inj-card {
+      background: var(--card); border: 1.5px solid var(--border);
+      border-radius: var(--r); padding: 12px 10px;
+      text-align: center; cursor: pointer; transition: all .2s;
+    }
+    .inj-card:hover, .inj-card.sel { border-color: var(--red); background: rgba(255,23,68,.08); }
+    .inj-emoji { font-size: 1.8rem; margin-bottom: 6px; }
+    .inj-name { font-size: .72rem; font-weight: 600; color: var(--text); }
+    .inj-sev {
+      font-size: .58rem; padding: 2px 7px; border-radius: 8px;
+      margin-top: 4px; display: inline-block; font-weight: 700;
+    }
+    .sev-critical { background: var(--red-dim); color: var(--red); }
+    .sev-serious  { background: var(--amber-dim); color: var(--amber); }
+
+    #fa-steps-area { display: none; }
+    #fa-steps-area.show { display: block; }
+    .fa-back {
+      display: flex; align-items: center; gap: 6px;
+      font-size: .78rem; color: var(--cyan); cursor: pointer;
+      margin-bottom: 10px; padding: 6px 0;
+    }
+    .fa-back:hover { opacity: .8; }
+    .fa-guide-title {
+      font-family: var(--font-display); font-size: 1.5rem; letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+    .step-card {
+      background: var(--card); border-radius: var(--r); padding: 13px;
+      margin-bottom: 8px; border-left: 3px solid var(--red);
+    }
+    .step-num { font-family: var(--font-display); font-size: 1.3rem; color: var(--red); letter-spacing: 1px; }
+    .step-title { font-size: .82rem; font-weight: 700; margin-bottom: 5px; }
+    .step-body { font-size: .75rem; color: var(--muted); line-height: 1.65; }
+    .step-warn {
+      background: rgba(255,145,0,.1); border: 1px solid rgba(255,145,0,.4);
+      border-radius: var(--r-sm); padding: 8px 11px;
+      margin-top: 8px; font-size: .7rem; color: var(--amber); line-height: 1.5;
+    }
+    .step-warn::before { content: "⚠️  "; }
+
+    #pane-incidents { overflow: hidden; }
+    .inc-scroll { flex: 1; overflow-y: auto; padding: 10px 12px; }
+    .report-form { background: var(--card); border-radius: var(--r); padding: 13px; margin-bottom: 12px; }
+    .form-label { font-size: .68rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 8px; display: block; }
+    .inc-types { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .inc-type-btn {
+      background: var(--card2); border: 1.5px solid var(--border2);
+      color: var(--muted); border-radius: 8px; padding: 6px 12px;
+      font-size: .7rem; font-weight: 600; transition: all .15s;
+    }
+    .inc-type-btn.sel { background: var(--red-dim); border-color: var(--red); color: var(--text); }
+    .inc-desc {
+      width: 100%; background: var(--card2); border: 1px solid var(--border2);
+      border-radius: var(--r-sm); color: var(--text); padding: 8px 12px;
+      font-size: .78rem; resize: none; outline: none; margin-bottom: 8px;
+      transition: border-color .2s;
+    }
+    .inc-desc:focus { border-color: var(--cyan); }
+    #report-btn {
+      width: 100%; background: var(--red-dim); border: 1px solid var(--red);
+      color: var(--text); border-radius: var(--r-sm); padding: 10px;
+      font-size: .82rem; font-weight: 700; letter-spacing: .4px;
+      transition: all .15s;
+    }
+    #report-btn:hover { background: var(--red); }
+    .incidents-list { }
+    .inc-card {
+      background: var(--card); border-radius: var(--r-sm); padding: 11px 13px;
+      margin-bottom: 7px; border-left: 3px solid var(--amber);
+      display: flex; gap: 10px; align-items: flex-start;
+    }
+    .inc-icon { font-size: 1.3rem; flex-shrink: 0; }
+    .inc-info { flex: 1; }
+    .inc-type-label { font-size: .78rem; font-weight: 600; }
+    .inc-meta { font-size: .65rem; color: var(--muted); margin-top: 3px; font-family: var(--font-mono); }
+    .inc-desc-text { font-size: .7rem; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+
+    #sos-numbers-bar {
+      position: absolute; top: 68px; left: 14px; z-index: 400;
+      background: var(--card);
+      border: 1px solid var(--border2);
+      border-radius: var(--r);
+      padding: 10px 12px;
+      display: none;
+      flex-direction: column; gap: 6px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.5);
+      min-width: 160px;
+    }
+    #sos-numbers-bar.show { display: flex; }
+    .sos-num-row {
+      display: flex; align-items: center; gap: 8px;
+      cursor: pointer;
+    }
+    .sos-num-row:hover .sos-num-val { color: var(--cyan); }
+    .sos-num-label { font-size: .62rem; color: var(--muted); width: 66px; }
+    .sos-num-val { font-family: var(--font-mono); font-size: .8rem; font-weight: 700; color: var(--text); }
+    .sos-num-icon { font-size: .9rem; }
+
+    #ai-modal {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(5,7,9,.97);
+      display: none; flex-direction: column;
+      backdrop-filter: blur(12px);
+    }
+    #ai-modal.show { display: flex; }
+    .ai-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 16px 16px 12px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .ai-avatar {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: linear-gradient(135deg, #d500f9, #651fff);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+      box-shadow: 0 0 16px rgba(213,0,249,.4);
+      flex-shrink: 0;
+    }
+    .ai-header-info { flex: 1; }
+    .ai-name { font-weight: 700; font-size: .9rem; }
+    .ai-status { font-size: .65rem; color: var(--muted); }
+    #close-ai {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: var(--card); border: 1px solid var(--border2);
+      color: var(--muted); font-size: 1.1rem;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .15s;
+    }
+    #close-ai:hover { background: var(--card2); color: var(--text); }
+    .ai-quick-prompts {
+      display: flex; gap: 6px; overflow-x: auto; padding: 10px 14px;
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .ai-quick-prompts::-webkit-scrollbar { display: none; }
+    .qprompt {
+      flex-shrink: 0; background: var(--card); border: 1px solid var(--border2);
+      color: var(--text); border-radius: 20px;
+      padding: 6px 14px; font-size: .7rem; font-weight: 600;
+      transition: all .15s;
+    }
+    .qprompt:hover { background: rgba(213,0,249,.15); border-color: var(--purple); }
+    #ai-messages {
+      flex: 1; overflow-y: auto; padding: 14px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .ai-msg { display: flex; gap: 8px; max-width: 90%; }
+    .ai-msg.user { align-self: flex-end; flex-direction: row-reverse; }
+    .ai-msg.assistant { align-self: flex-start; }
+    .msg-bubble {
+      padding: 10px 13px; border-radius: 14px;
+      font-size: .8rem; line-height: 1.65; max-width: 100%;
+    }
+    .user .msg-bubble { background: var(--purple); color: #fff; border-bottom-right-radius: 4px; }
+    .assistant .msg-bubble { background: var(--card); color: var(--text); border-bottom-left-radius: 4px; border: 1px solid var(--border2); }
+    .ai-typing { display: flex; gap: 4px; align-items: center; padding: 12px 16px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--purple); animation: dot-bounce .9s ease-in-out infinite; }
+    .dot:nth-child(2) { animation-delay: .15s; }
+    .dot:nth-child(3) { animation-delay: .3s; }
+    @keyframes dot-bounce { 0%,100%{ transform: translateY(0); opacity:.4; } 50%{ transform: translateY(-6px); opacity:1; } }
+    .ai-input-row {
+      display: flex; gap: 8px; padding: 10px 14px 14px;
+      border-top: 1px solid var(--border); flex-shrink: 0;
+    }
+    #ai-input {
+      flex: 1; background: var(--card); border: 1px solid var(--border2);
+      border-radius: 24px; color: var(--text);
+      padding: 10px 16px; font-size: .82rem; outline: none;
+      transition: border-color .2s; resize: none;
+    }
+    #ai-input:focus { border-color: var(--purple); }
+    #ai-send {
+      background: var(--purple); color: #fff; border-radius: 50%;
+      width: 42px; height: 42px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; transition: all .15s;
+    }
+    #ai-send:hover { background: #e040fb; }
+    #ai-send:disabled { background: var(--faint); }
+
+    #medid-modal {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(5,7,9,.97);
+      display: none; flex-direction: column;
+      backdrop-filter: blur(12px);
+      overflow-y: auto;
+    }
+    #medid-modal.show { display: flex; }
+    .medid-wrap { max-width: 500px; width: 100%; margin: auto; padding: 24px 16px; }
+    .medid-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .medid-title { font-family: var(--font-display); font-size: 2rem; letter-spacing: 2px; color: var(--cyan); }
+    #close-medid { width: 34px; height: 34px; border-radius: 50%; background: var(--card); border: 1px solid var(--border2); color: var(--muted); font-size: 1.1rem; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+    #close-medid:hover { background: var(--card2); color: var(--text); }
+    .medid-notice {
+      background: var(--cyan-dim); border: 1px solid rgba(0,229,255,.3);
+      border-radius: var(--r); padding: 10px 14px; margin-bottom: 18px;
+      font-size: .74rem; color: var(--cyan); line-height: 1.6;
+    }
+    .medid-section { margin-bottom: 20px; }
+    .medid-sec-title { font-size: .68rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 10px; }
+    .medid-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .medid-field { display: flex; flex-direction: column; gap: 5px; }
+    .medid-label { font-size: .68rem; color: var(--muted); font-weight: 600; }
+    .medid-input {
+      background: var(--card); border: 1px solid var(--border2);
+      border-radius: var(--r-sm); color: var(--text); padding: 9px 12px;
+      font-size: .82rem; outline: none; transition: border-color .2s;
+    }
+    .medid-input:focus { border-color: var(--cyan); }
+    .medid-input-full { grid-column: 1 / -1; }
+    #save-medid {
+      width: 100%; background: var(--cyan); color: var(--void);
+      border-radius: var(--r); padding: 13px;
+      font-size: .9rem; font-weight: 700; letter-spacing: .5px;
+      transition: all .15s; margin-top: 8px;
+    }
+    #save-medid:hover { background: #4ff0ff; }
+    .medid-display {
+      background: var(--card); border-radius: var(--r); padding: 14px;
+      border: 1px solid var(--border2); margin-bottom: 16px;
+    }
+    .medid-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: .8rem; }
+    .medid-row:last-child { border-bottom: none; }
+    .medid-key { color: var(--muted); }
+    .medid-val { font-weight: 600; font-family: var(--font-mono); }
+    .medid-val.blood { color: var(--red); font-size: .9rem; }
+
+    #loc-detect-banner {
+      position: fixed; top: 65px; left: 12px; right: 12px; z-index: 450;
+      background: linear-gradient(135deg, rgba(50,210,255,.15), rgba(50,210,255,.05));
+      border: 1.5px solid rgba(50,210,255,.5);
+      border-radius: var(--r); padding: 12px 14px;
+      display: none; flex-direction: column; gap: 8px;
+      box-shadow: 0 4px 24px rgba(50,210,255,.15);
+      backdrop-filter: blur(8px);
+      animation: slide-down .35s cubic-bezier(.34,1.56,.64,1);
+    }
+    #loc-detect-banner.show { display: flex; }
+    @keyframes slide-down { from{ opacity:0; transform:translateY(-12px) } to{ opacity:1; transform:translateY(0) } }
+    .banner-title { font-size: .82rem; font-weight: 700; color: var(--cyan); display: flex; align-items: center; gap: 6px; }
+    .banner-sub { font-size: .72rem; color: var(--muted); line-height: 1.4; }
+    .banner-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .banner-btn-primary {
+      background: var(--cyan); color: var(--void);
+      border-radius: var(--r-sm); padding: 9px 18px;
+      font-size: .8rem; font-weight: 800; letter-spacing: .4px;
+      transition: all .15s; flex: 1; min-width: 140px;
+      box-shadow: 0 0 16px rgba(50,210,255,.3);
+    }
+    .banner-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 2px 20px rgba(50,210,255,.45); }
+    .banner-btn-primary:active { transform: scale(.97); }
+    .banner-btn-primary.loading { background: var(--card2); color: var(--muted); cursor: not-allowed; box-shadow: none; }
+    .banner-btn-dismiss {
+      background: transparent; color: var(--muted); border: 1px solid var(--border2);
+      border-radius: var(--r-sm); padding: 9px 14px;
+      font-size: .72rem; font-weight: 600;
+      transition: all .15s;
+    }
+    .banner-btn-dismiss:hover { background: var(--card2); color: var(--text); }
+
+    #loc-fab {
+      position: fixed; right: 14px; z-index: 450;
+      bottom: calc(var(--sheet-h) + 14px);
+      width: 52px; height: 52px; border-radius: 50%;
+      background: linear-gradient(135deg, #32d2ff, #00b4d8);
+      border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem;
+      box-shadow: 0 4px 20px rgba(50,210,255,.5), 0 0 0 0 rgba(50,210,255,.4);
+      transition: all .2s;
+      animation: fab-pulse 2.5s ease-in-out infinite;
+    }
+    #loc-fab:hover { transform: scale(1.08); box-shadow: 0 6px 28px rgba(50,210,255,.65); }
+    #loc-fab:active { transform: scale(.95); }
+    #loc-fab.located { background: linear-gradient(135deg, #30d158, #1e9e40); box-shadow: 0 4px 20px rgba(48,209,88,.4); animation: none; }
+    #loc-fab.loading { background: var(--card2); box-shadow: none; animation: none; cursor: wait; }
+    @keyframes fab-pulse {
+      0%,100%{ box-shadow: 0 4px 20px rgba(50,210,255,.5), 0 0 0 0 rgba(50,210,255,.35); }
+      50%{ box-shadow: 0 4px 20px rgba(50,210,255,.5), 0 0 0 10px rgba(50,210,255,0); }
+    }
+    #loc-fab-tooltip {
+      position: fixed; right: 72px; z-index: 450;
+      bottom: calc(var(--sheet-h) + 28px);
+      background: var(--card2); border: 1px solid var(--border2);
+      border-radius: var(--r-sm); padding: 5px 10px;
+      font-size: .68rem; font-weight: 600; color: var(--text);
+      white-space: nowrap; pointer-events: none;
+      opacity: 0; transition: opacity .2s;
+    }
+    #loc-fab:hover + #loc-fab-tooltip { opacity: 1; }
+
+    #loading-overlay {
+      position: fixed; inset: 0; z-index: 500;
+      background: var(--void);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      transition: opacity .5s;
+    }
+    #loading-overlay.hide { opacity: 0; pointer-events: none; }
+    .load-logo { font-family: var(--font-display); font-size: 3.5rem; letter-spacing: 6px; color: var(--red); text-shadow: 0 0 50px var(--red-glow), 0 0 80px rgba(255,45,85,.2); margin-bottom: 8px; }
+    .load-sub { font-size: .72rem; color: var(--muted); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 36px; font-family: var(--font-mono); }
+    .load-bar-wrap { width: 220px; height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; margin-bottom: 16px; }
+    .load-bar { height: 100%; background: linear-gradient(90deg, var(--red), #ff6b8a); border-radius: 2px; animation: load-grow 2s ease-in-out forwards; }
+    @keyframes load-grow { from{ width: 0% } to{ width: 100% } }
+    .load-hint { font-size: .62rem; color: var(--faint); letter-spacing: 1px; font-family: var(--font-mono); animation: blink 1.2s ease-in-out infinite; }
+    @keyframes blink { 0%,100%{opacity:.3} 50%{opacity:.9} }
+
+    #toast-wrap {
+      position: fixed; bottom: calc(var(--sheet-h) + 12px); left: 50%;
+      transform: translateX(-50%);
+      z-index: 900; display: flex; flex-direction: column; align-items: center; gap: 6px;
+    }
+    .toast {
+      background: var(--card2); border: 1px solid var(--border2);
+      border-radius: 24px; padding: 8px 18px;
+      font-size: .78rem; color: var(--text);
+      box-shadow: 0 4px 20px rgba(0,0,0,.4);
+      animation: toast-in .3s ease;
+    }
+    @keyframes toast-in { from{ opacity:0; transform: translateY(8px) } to{ opacity:1; transform: translateY(0) } }
+    .toast.success { background: var(--green-dim); border-color: rgba(105,240,174,.4); color: var(--green); }
+    .toast.error   { background: var(--red-dim);   border-color: rgba(255,23,68,.4);   color: var(--red); }
+    .toast.warn    { background: var(--amber-dim);  border-color: rgba(255,145,0,.4);  color: var(--amber); }
+
+    #loc-permission {
+      position: fixed; bottom: calc(var(--sheet-h) + 12px); left: 50%;
+      transform: translateX(-50%);
+      background: var(--card2); border: 1px solid var(--cyan);
+      border-radius: var(--r); padding: 14px 18px;
+      z-index: 400; display: none; flex-direction: column; align-items: center; gap: 10px;
+      text-align: center; min-width: 260px;
+      box-shadow: 0 4px 24px rgba(0,229,255,.15);
+    }
+    #loc-permission.show { display: flex; }
+    #loc-permission p { font-size: .78rem; color: var(--muted); line-height: 1.5; }
+    #grant-loc {
+      background: var(--cyan); color: var(--void);
+      border-radius: var(--r-sm); padding: 9px 24px;
+      font-size: .82rem; font-weight: 700;
+    }
+
+    @media (min-width: 700px) {
+      :root { --sheet-h: 45vh; }
+      .inj-grid { grid-template-columns: 1fr 1fr 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Loading Screen -->
+  <div id="loading-overlay">
+    <div class="load-logo">ROAD<em style="color:var(--text)">SOS</em></div>
+    <div class="load-sub">Emergency Response System</div>
+    <div class="load-bar-wrap"><div class="load-bar"></div></div>
+    <div class="load-hint">DETECTING YOUR LOCATION...</div>
+  </div>
+
+  <!-- Map -->
+  <div id="map"></div>
+
+  <div id="loc-detect-banner">
+    <div class="banner-title">📍 Location Not Detected</div>
+    <div class="banner-sub">Enable location access so ROADSOS can find emergency services near you.</div>
+    <div class="banner-actions">
+      <button class="banner-btn-primary" id="banner-detect-btn" onclick="locateMeWithFeedback()">🎯 Detect My Location</button>
+      <button class="banner-btn-dismiss" onclick="hideBanner()">Dismiss</button>
+    </div>
+  </div>
+
+  <!-- Floating Location Button -->
+  <button id="loc-fab" title="Detect My Location" onclick="locateMeWithFeedback()">📍</button>
+  <div id="loc-fab-tooltip">Detect My Location</div>
+
+  <!-- Crash Detection Overlay -->
+  <div id="crash-overlay">
+    <div class="crash-pulse">💥</div>
+    <div class="crash-title">CRASH DETECTED</div>
+    <div class="crash-sub">
+      Sudden impact detected via your device sensor.<br>
+      Auto-alerting emergency services in:
+    </div>
+    <div class="crash-countdown-ring">
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="35" fill="none" stroke="rgba(255,23,68,.2)" stroke-width="6"/>
+        <circle id="crash-ring-fill" cx="40" cy="40" r="35"/>
+      </svg>
+      <div id="crash-count-display">10</div>
+    </div>
+    <div class="crash-actions">
+      <button id="cancel-crash">✓ I'M OKAY</button>
+      <button id="confirm-crash">🆘 SEND SOS NOW</button>
+    </div>
+  </div>
+
+  <!-- Top Bar -->
+  <div id="topbar">
+    <div>
+      <div class="logo">ROAD<em>SOS</em></div>
+    </div>
+    <div id="loc-display">Locating...</div>
+    <div id="net-badge">● OFFLINE</div>
+    <button id="medid-topbtn">🩺 MED ID</button>
+    <button id="ai-btn" title="AI Emergency Guide" style="background:linear-gradient(135deg,rgba(191,90,242,.25),rgba(191,90,242,.1));border:1.5px solid rgba(191,90,242,.5);color:var(--purple);border-radius:8px;padding:6px 11px;font-size:.68rem;font-weight:700;letter-spacing:.3px;white-space:nowrap;transition:all .15s;">🤖 AI</button>
+  </div>
+
+  <!-- Golden Hour Widget -->
+  <div id="golden-widget" title="Click to stop Golden Hour timer">
+    <div class="golden-ring-wrap" id="golden-ring-wrap">
+      <svg width="90" height="90" viewBox="0 0 90 90">
+        <circle cx="45" cy="45" r="40" class="ring-bg"/>
+        <circle cx="45" cy="45" r="40" id="golden-ring-fill" class="ring-fill"/>
+      </svg>
+      <div class="golden-center">
+        <div class="golden-time" id="golden-time-display">60:00</div>
+        <div class="golden-label">GOLDEN HR</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Toast container -->
+  <div id="toast-wrap"></div>
+
+  <!-- Location permission prompt -->
+  <div id="loc-permission">
+    <div style="font-size:1.8rem">📍</div>
+    <p>ROADSOS needs your location to find nearby emergency services.</p>
+    <button id="grant-loc">Grant Location Access</button>
+  </div>
+
+  <!-- Bottom Sheet -->
+  <div id="bottom-sheet">
+    <div class="sheet-handle-wrap" id="sheet-handle">
+      <div class="sheet-handle"></div>
+    </div>
+
+    <!-- Language selector -->
+    <div class="panic-lang-row" id="panicLangRow">
+      <button class="panic-lang-btn active" data-lang="en" onclick="setPanicLang('en')">EN</button>
+      <button class="panic-lang-btn" data-lang="hi" onclick="setPanicLang('hi')">हिंदी</button>
+      <button class="panic-lang-btn" data-lang="mr" onclick="setPanicLang('mr')">मराठी</button>
+      <button class="panic-lang-btn" data-lang="ta" onclick="setPanicLang('ta')">தமிழ்</button>
+      <button class="panic-lang-btn" data-lang="bn" onclick="setPanicLang('bn')">বাংলা</button>
+      <button class="panic-lang-btn" data-lang="te" onclick="setPanicLang('te')">తెలుగు</button>
+    </div>
+
+    <!-- 2×2 emergency call grid -->
+    <div class="panic-grid">
+      <button class="panic-btn pb-ambulance" id="btn-ambulance" onclick="panicCall('ambulance')">
+        <span class="pb-icon">🚑</span>
+        <span class="pb-label" id="plbl-ambulance">Ambulance</span>
+        <span class="pb-num" id="pnum-ambulance">108</span>
+        <span class="pb-tap" id="ptap-ambulance">Tap to call</span>
+      </button>
+      <button class="panic-btn pb-police" id="btn-police" onclick="panicCall('police')">
+        <span class="pb-icon">👮</span>
+        <span class="pb-label" id="plbl-police">Police</span>
+        <span class="pb-num" id="pnum-police">100</span>
+        <span class="pb-tap" id="ptap-police">Tap to call</span>
+      </button>
+      <button class="panic-btn pb-fire" id="btn-fire" onclick="panicCall('fire')">
+        <span class="pb-icon">🚒</span>
+        <span class="pb-label" id="plbl-fire">Fire Brigade</span>
+        <span class="pb-num" id="pnum-fire">101</span>
+        <span class="pb-tap" id="ptap-fire">Tap to call</span>
+      </button>
+      <button class="panic-btn pb-hospital" id="btn-hospital" onclick="panicCall('general')">
+        <span class="pb-icon">🏥</span>
+        <span class="pb-label" id="plbl-hospital">Nearest Hospital</span>
+        <span class="pb-num" id="pnum-hospital">112</span>
+        <span class="pb-tap" id="ptap-hospital">Tap to call</span>
+      </button>
+    </div>
+
+    <!-- Share location -->
+    <button class="panic-share" id="share-btn" onclick="broadcastLocation()">
+      <span class="ps-icon">📡</span>
+      <span id="plbl-share">Share my location now</span>
+    </button>
+
+    <!-- Better service link -->
+    <div class="panic-better-row">
+      <button class="panic-better-link" id="plbl-better" onclick="showBetterService()">
+        Service not responding? Find a better option →
+      </button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="sheet-tabs">
+      <button class="stab active" data-pane="pane-search">🔍 Services</button>
+      <button class="stab" data-pane="pane-firstaid">🩹 First Aid</button>
+      <button class="stab" data-pane="pane-incidents">⚠️ Incidents</button>
+    </div>
+
+    <!-- Search Pane -->
+    <div id="pane-search" class="sheet-pane active">
+      <div class="search-controls">
+        <div class="ctrl-row">
+          <input type="text" id="lat-input" class="field" placeholder="Latitude" style="max-width:130px;font-family:var(--font-mono);font-size:.76rem"/>
+          <input type="text" id="lon-input" class="field" placeholder="Longitude" style="max-width:130px;font-family:var(--font-mono);font-size:.76rem"/>
+          <button class="icon-btn" id="locate-btn" title="Use GPS">📍</button>
+        </div>
+        <div class="radius-row">
+          <span style="font-size:.72rem;color:var(--muted)">Radius:</span>
+          <input type="range" id="radius-slider" min="1" max="20" value="5" step="1"/>
+          <span class="radius-val"><span id="radius-val">5</span> km</span>
+        </div>
+        <div class="cat-chips" id="cat-chips"></div>
+        <button id="search-btn">⚡ Find Nearby Emergency Services</button>
+      </div>
+      <div id="results-area">
+        <div class="empty-state">
+          <div class="empty-icon">🗺️</div>
+          <p>Tap <strong>Find Nearby Services</strong> to locate hospitals, police stations, ambulances, and more near you.</p>
+        </div>
+      </div>
+      <div id="results-summary"></div>
+    </div>
+
+    <!-- First Aid Pane -->
+    <div id="pane-firstaid" class="sheet-pane">
+      <div class="fa-scroll">
+        <div class="fa-header">
+          <span class="fa-title">Quick First Aid Guide</span>
+          <span class="offline-ok">✓ WORKS OFFLINE</span>
+        </div>
+        <div id="fa-grid-area">
+          <div class="inj-grid" id="inj-grid"></div>
+        </div>
+        <div id="fa-steps-area">
+          <div class="fa-back" id="fa-back">← Back to injury list</div>
+          <div id="fa-guide-content"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Incidents Pane -->
+    <div id="pane-incidents" class="sheet-pane">
+      <div class="inc-scroll">
+        <div class="report-form">
+          <label class="form-label">Report a Road Hazard / Incident</label>
+          <div class="inc-types" id="inc-types">
+            <button class="inc-type-btn" data-type="accident">Accident</button>
+            <button class="inc-type-btn" data-type="breakdown"> Breakdown</button>
+            <button class="inc-type-btn" data-type="pothole">Pothole</button>
+            <button class="inc-type-btn" data-type="flood">Flood</button>
+            <button class="inc-type-btn" data-type="debris">Debris</button>
+            <button class="inc-type-btn" data-type="blocked">Road Blocked</button>
+          </div>
+          <textarea id="inc-desc-input" class="inc-desc" rows="2" placeholder="Add details (optional)..."></textarea>
+          <button id="report-btn">Report at My Location</button>
+        </div>
+        <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;font-weight:700;">
+          Nearby Incidents (last 6 hrs)
+        </div>
+        <div id="incidents-list">
+          <div class="empty-state" style="padding:16px 20px">
+            <p style="font-size:.75rem">No recent incidents reported near you.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Modal -->
+  <div id="ai-modal">
+    <div class="ai-header">
+      <div class="ai-avatar">🤖</div>
+      <div class="ai-header-info">
+        <div class="ai-name">ROADSOS AI Guide</div>
+        <div class="ai-status" id="ai-status">Emergency Guide · Free AI (Gemini)</div>
+      </div>
+      <button id="close-ai">✕</button>
+    </div>
+    <div class="ai-quick-prompts">
+      <button class="qprompt" data-q="There's been a road accident. What should I do immediately?">🚗 Accident response</button>
+      <button class="qprompt" data-q="Someone is bleeding badly from a leg injury. How do I help?">🩸 Stop bleeding</button>
+      <button class="qprompt" data-q="A person is unconscious and not breathing. Walk me through CPR.">❤️ CPR steps</button>
+      <button class="qprompt" data-q="What information should I give to emergency services (108/112) when calling?">📞 What to tell 108</button>
+      <button class="qprompt" data-q="I think someone has a neck or spine injury. What should I do?">🦾 Spinal injury</button>
+      <button class="qprompt" data-q="How do I treat someone in shock after an accident?">⚡ Treat shock</button>
+    </div>
+    <div id="ai-messages">
+      <div class="ai-msg assistant">
+        <div class="msg-bubble">
+          Hi, I'm ROADSOS AI- your emergency response guide.<br><br>
+          I can walk you through first aid, tell you what to say when calling 112/108, help you triage injuries, and guide bystanders step by step.<br><br>
+          <strong>What's happening? How can I help right now?</strong>
+        </div>
+      </div>
+    </div>
+    <div class="ai-input-row">
+      <textarea id="ai-input" rows="1" placeholder="Describe the emergency..."></textarea>
+      <button id="ai-send">➤</button>
+    </div>
+  </div>
+
+  <!-- Medical ID Modal -->
+  <div id="medid-modal">
+    <div class="medid-wrap">
+      <div class="medid-header">
+        <div class="medid-title">MEDICAL ID</div>
+        <button id="close-medid">✕</button>
+      </div>
+      <div class="medid-notice">
+        🔒 Stored locally on this device only. Shown to emergency responders. Enable lock-screen access in your phone settings.
+      </div>
+      <div id="medid-display" style="display:none"></div>
+      <div id="medid-form">
+        <div class="medid-section">
+          <div class="medid-sec-title">Personal</div>
+          <div class="medid-grid">
+            <div class="medid-field">
+              <label class="medid-label">Full Name</label>
+              <input type="text" id="mid-name" class="medid-input medid-input-full" placeholder="Your full name"/>
+            </div>
+            <div class="medid-field">
+              <label class="medid-label">Date of Birth</label>
+              <input type="date" id="mid-dob" class="medid-input"/>
+            </div>
+            <div class="medid-field">
+              <label class="medid-label">Blood Type</label>
+              <select id="mid-blood" class="medid-input">
+                <option value="">Select...</option>
+                <option>A+</option><option>A-</option>
+                <option>B+</option><option>B-</option>
+                <option>AB+</option><option>AB-</option>
+                <option>O+</option><option>O-</option>
+                <option>Unknown</option>
+              </select>
+            </div>
+            <div class="medid-field">
+              <label class="medid-label">Weight (kg)</label>
+              <input type="number" id="mid-weight" class="medid-input" placeholder="65"/>
+            </div>
+          </div>
+        </div>
+        <div class="medid-section">
+          <div class="medid-sec-title">Medical Info</div>
+          <div class="medid-grid">
+            <div class="medid-field medid-input-full">
+              <label class="medid-label">Allergies</label>
+              <input type="text" id="mid-allergies" class="medid-input medid-input-full" placeholder="e.g. Penicillin, Aspirin, None"/>
+            </div>
+            <div class="medid-field medid-input-full">
+              <label class="medid-label">Medical Conditions</label>
+              <input type="text" id="mid-conditions" class="medid-input medid-input-full" placeholder="e.g. Diabetes, Hypertension, None"/>
+            </div>
+            <div class="medid-field medid-input-full">
+              <label class="medid-label">Current Medications</label>
+              <input type="text" id="mid-meds" class="medid-input medid-input-full" placeholder="e.g. Metformin, None"/>
+            </div>
+          </div>
+        </div>
+        <div class="medid-section">
+          <div class="medid-sec-title">Emergency Contacts</div>
+          <div class="medid-grid">
+            <div class="medid-field">
+              <label class="medid-label">Contact 1 Name</label>
+              <input type="text" id="mid-ec1-name" class="medid-input" placeholder="Full name"/>
+            </div>
+            <div class="medid-field">
+              <label class="medid-label">Contact 1 Phone</label>
+              <input type="tel" id="mid-ec1-phone" class="medid-input" placeholder="+91 XXXXXX"/>
+            </div>
+            <div class="medid-field">
+              <label class="medid-label">Contact 2 Name</label>
+              <input type="text" id="mid-ec2-name" class="medid-input" placeholder="Full name"/>
+            </div>
+            <div class="medid-field">
+              <label class="medid-label">Contact 2 Phone</label>
+              <input type="tel" id="mid-ec2-phone" class="medid-input" placeholder="+91 XXXXXX"/>
+            </div>
+          </div>
+        </div>
+        <button id="save-medid">💾 Save Medical ID</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+
+const STATE = {
+  lat: null, lon: null,
+  countryCode: 'IN',
+  emergencyNums: { police:'100', ambulance:'108', fire:'101', general:'112' },
+  searchRadius: 5,
+  activeCategories: new Set(),
+  markerLayers: {},
+  selectedSvc: null,
+  goldenTimerActive: false,
+  goldenTimerInterval: null,
+  goldenSecondsLeft: 3600,
+  crashCountdown: 10,
+  crashInterval: null,
+  crashCancelTimer: null,
+  aiHistory: [],
+  medid: null,
+  selectedIncType: null,
+  sheetExpanded: false,
+};
+
+const CATEGORY_META = {{ categories | tojson }};
+
+const map = L.map('map', {
+  zoomControl: true,
+  zoomAnimation: true,
+}).setView([20.5937, 78.9629], 5);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OSM',
+  maxZoom: 19,
+}).addTo(map);
+
+// Force map behind sheet
+map.getContainer().style.zIndex = '0';
+
+let userMarker = null;
+let userAccCircle = null;
+
+function makeIcon(emoji, color, size=36) {
+  return L.divIcon({
+    html: `<div style="
+      width:${size}px;height:${size}px;
+      background:${color};
+      border:2px solid rgba(255,255,255,.35);
+      border-radius:50% 50% 50% 0;
+      transform:rotate(-45deg);
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 2px 12px rgba(0,0,0,.5);
+    "><span style="transform:rotate(45deg);font-size:${Math.round(size*.42)}px;line-height:1">${emoji}</span></div>`,
+    className: '',
+    iconSize: [size, size],
+    iconAnchor: [size/2, size],
+    popupAnchor: [0, -size],
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// GEOLOCATION
+// ═══════════════════════════════════════════════════════════════════════
+function setLocation(lat, lon, accuracy) {
+  STATE.lat = lat; STATE.lon = lon;
+  document.getElementById('lat-input').value = lat.toFixed(5);
+  document.getElementById('lon-input').value = lon.toFixed(5);
+  map.setView([lat, lon], 14, { animate: true });
+
+  if (userMarker) map.removeLayer(userMarker);
+  if (userAccCircle) map.removeLayer(userAccCircle);
+
+  userMarker = L.marker([lat, lon], {
+    icon: L.divIcon({
+      html: `<div style="
+        width:18px;height:18px;
+        background:var(--cyan);
+        border:3px solid white;
+        border-radius:50%;
+        box-shadow:0 0 12px var(--cyan),0 0 0 8px rgba(0,229,255,.15);
+        animation:pulse-user 1.5s ease-in-out infinite;
+      "></div>
+      <style>@keyframes pulse-user{0%,100%{box-shadow:0 0 12px var(--cyan),0 0 0 0 rgba(0,229,255,.3)}50%{box-shadow:0 0 12px var(--cyan),0 0 0 18px rgba(0,229,255,0)}}</style>`,
+      className: '',
+      iconSize: [18,18],
+      iconAnchor: [9,9],
+    })
+  }).addTo(map);
+
+  if (accuracy && accuracy < 500) {
+    userAccCircle = L.circle([lat,lon], {radius:accuracy, color:'rgba(0,229,255,.15)', fillColor:'rgba(0,229,255,.05)', fillOpacity:1, weight:1}).addTo(map);
+  }
+
+  geocode(lat, lon);
+  loadEmergencyNumbers(lat, lon);
+  hideEl('loc-permission');
+}
+
+function geocode(lat, lon) {
+  fetch(`/api/geocode?lat=${lat}&lon=${lon}`)
+    .then(r => r.json())
+    .then(d => {
+      STATE.countryCode = d.country_code || 'IN';
+      const city = d.city || d.road || '';
+      const parts = [city, d.country].filter(Boolean);
+      document.getElementById('loc-display').textContent = parts.join(', ') || `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+      autoDetectPanicLang(d.state || d.region || '');
+    })
+    .catch(() => {
+      document.getElementById('loc-display').textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+    });
+}
+
+function loadEmergencyNumbers(lat, lon) {
+  fetch(`/api/geocode?lat=${lat}&lon=${lon}`)
+    .then(r => r.json())
+    .then(d => {
+      return fetch(`/api/emergency?country=${d.country_code || 'IN'}`);
+    })
+    .then(r => r.json())
+    .then(d => {
+      STATE.emergencyNums = d;
+      updatePanicNumbers();
+    })
+    .catch(() => {});
+}
+
+function useDefaultLocation() {
+  // Try IP-based geolocation first before falling back to New Delhi
+  fetch('https://ipapi.co/json/')
+    .then(r => r.json())
+    .then(d => {
+      if (d.latitude && d.longitude) {
+        toast(`📍 Using approximate location: ${d.city || d.region || 'your area'}`, 'warn');
+        setLocation(parseFloat(d.latitude), parseFloat(d.longitude), 5000);
+        showBanner(false);
+      } else {
+        throw new Error('no coords');
+      }
+    })
+    .catch(() => {
+      toast('📍 Location unavailable — enter coordinates manually', 'warn');
+      setLocation(28.6139, 77.2090, 9999);
+      showBanner(true);
+    });
+}
+
+function showBanner(show) {
+  const b = document.getElementById('loc-detect-banner');
+  if (b) {
+    if (show) b.classList.add('show');
+    else b.classList.remove('show');
+  }
+}
+
+function hideBanner() { showBanner(false); }
+
+function setFabState(state) {
+  const fab = document.getElementById('loc-fab');
+  if (!fab) return;
+  fab.classList.remove('located','loading');
+  if (state === 'located') { fab.classList.add('located'); fab.textContent = '✓'; }
+  else if (state === 'loading') { fab.classList.add('loading'); fab.textContent = '⏳'; }
+  else { fab.textContent = '📍'; }
+}
+
+function locateMe() {
+  if (!navigator.geolocation) {
+    useDefaultLocation();
+    return;
+  }
+  document.getElementById('locate-btn').textContent = '⏳';
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      document.getElementById('locate-btn').textContent = '📍';
+      setLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+      setFabState('located');
+      showBanner(false);
+    },
+    err => {
+      document.getElementById('locate-btn').textContent = '📍';
+      const errMsg = err.code === 1 ? 'Location permission denied — tap 📍 to retry after allowing in browser' :
+                     err.code === 2 ? 'Location unavailable — using approximate location' :
+                     'Location timed out — tap 📍 to try again';
+      toast('⚠️ ' + errMsg, 'warn');
+      setFabState('');
+      useDefaultLocation();
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
+  );
+}
+
+// New: called by FAB and banner button with visual feedback
+function locateMeWithFeedback() {
+  setFabState('loading');
+  const bannerBtn = document.getElementById('banner-detect-btn');
+  if (bannerBtn) { bannerBtn.classList.add('loading'); bannerBtn.textContent = '⏳ Detecting...'; }
+  document.getElementById('locate-btn').textContent = '⏳';
+
+  if (!navigator.geolocation) {
+    setFabState('');
+    if (bannerBtn) { bannerBtn.classList.remove('loading'); bannerBtn.textContent = '🎯 Detect My Location'; }
+    useDefaultLocation();
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      setFabState('located');
+      if (bannerBtn) { bannerBtn.classList.remove('loading'); bannerBtn.textContent = '🎯 Detect My Location'; }
+      document.getElementById('locate-btn').textContent = '📍';
+      setLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+      showBanner(false);
+      toast('✅ Location detected!', 'success');
+    },
+    err => {
+      setFabState('');
+      if (bannerBtn) { bannerBtn.classList.remove('loading'); bannerBtn.textContent = '🎯 Detect My Location'; }
+      document.getElementById('locate-btn').textContent = '📍';
+      if (err.code === 1) {
+        // Permission denied - show helpful message
+        toast('❌ Location denied — please allow location in your browser settings, then tap 📍', 'error');
+        showBanner(true);
+        const banner = document.getElementById('loc-detect-banner');
+        if (banner) {
+          banner.querySelector('.banner-sub').textContent = 'You denied location access. Go to your browser settings → Site Settings → Location → Allow for this site, then tap Detect.';
+        }
+      } else {
+        useDefaultLocation();
+      }
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// CATEGORY CHIPS
+// ═══════════════════════════════════════════════════════════════════════
+function initChips() {
+  const wrap = document.getElementById('cat-chips');
+  wrap.innerHTML = '';
+  for (const [key, meta] of Object.entries(CATEGORY_META)) {
+    const btn = document.createElement('button');
+    btn.className = 'chip active';
+    btn.dataset.cat = key;
+    btn.style.borderColor = meta.color;
+    btn.style.background = meta.color + '22';
+    btn.style.color = meta.color;
+    btn.innerHTML = `${meta.icon} ${meta.label}`;
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('active');
+      if (btn.classList.contains('active')) {
+        STATE.activeCategories.delete(key);
+        btn.style.background = meta.color + '22';
+        btn.style.color = meta.color;
+      } else {
+        STATE.activeCategories.add(key);
+        btn.style.background = 'var(--card)';
+        btn.style.color = 'var(--muted)';
+      }
+    });
+    wrap.appendChild(btn);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SEARCH
+// ═══════════════════════════════════════════════════════════════════════
+async function doSearch() {
+  const lat = parseFloat(document.getElementById('lat-input').value);
+  const lon = parseFloat(document.getElementById('lon-input').value);
+  if (isNaN(lat) || isNaN(lon)) { toast('Enter valid coordinates or tap 📍', 'error'); return; }
+
+  STATE.lat = lat; STATE.lon = lon;
+  const radius = STATE.searchRadius;
+
+  // Build cats param: chips NOT in activeCategories (active = included)
+  const excluded = STATE.activeCategories;
+  const allCats = Object.keys(CATEGORY_META);
+  const cats = allCats.filter(c => !excluded.has(c));
+
+  const btn = document.getElementById('search-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Searching...';
+
+  // Clear old markers
+  clearMarkers();
+
+  try {
+    const url = `/api/search?lat=${lat}&lon=${lon}&radius=${radius}${cats.length ? '&categories=' + cats.join(',') : ''}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    renderResults(data);
+    renderMarkers(data);
+    toast(`Found ${data.total} services in ${radius}km radius`, 'success');
+
+    // Auto load incidents
+    loadIncidents();
+  } catch(e) {
+    toast('Search failed. Check connection.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⚡ FIND NEARBY SERVICES';
+  }
+}
+
+function clearMarkers() {
+  for (const layer of Object.values(STATE.markerLayers)) {
+    map.removeLayer(layer);
+  }
+  STATE.markerLayers = {};
+}
+
+function renderMarkers(data) {
+  for (const [cat, info] of Object.entries(data.results)) {
+    const meta = CATEGORY_META[cat] || {};
+    const group = L.layerGroup().addTo(map);
+    STATE.markerLayers[cat] = group;
+    for (const svc of info.services.slice(0, 12)) {
+      const marker = L.marker([svc.lat, svc.lon], { icon: makeIcon(meta.icon||'📍', meta.color||'#888', 36) });
+      marker.bindPopup(`
+        <div>
+          <strong style="font-size:.85rem">${svc.name}</strong><br>
+          <span style="color:var(--muted);font-size:.72rem">${meta.label}</span><br>
+          <span style="font-size:.72rem;color:${meta.color}">${svc.distance_km} km away</span>
+          ${svc.phone ? `<br><a href="tel:${svc.phone}" style="color:var(--cyan);font-size:.75rem">📞 ${svc.phone}</a>` : ''}
+          ${svc.address ? `<br><span style="font-size:.68rem;color:var(--muted)">${svc.address}</span>` : ''}
+          <br><br>
+          <a href="https://www.google.com/maps/dir/?api=1&destination=${svc.lat},${svc.lon}" target="_blank" style="color:var(--green);font-size:.72rem;font-weight:600">🗺️ Get Directions</a>
+        </div>
+      `, { maxWidth: 240 });
+      marker.addTo(group);
+    }
+  }
+}
+
+function renderResults(data) {
+  const area = document.getElementById('results-area');
+  area.innerHTML = '';
+
+  if (!data.total) {
+    area.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div><p>No services found within ${data.radius}km. Try increasing the radius.</p></div>`;
+    return;
+  }
+
+  for (const [cat, info] of Object.entries(data.results)) {
+    if (!info.count) continue;
+    const meta = CATEGORY_META[cat] || {};
+    const srcClass = { live:'src-live', cache:'src-cache', offline_cache:'src-offline' }[info.source] || 'src-cache';
+    const srcText  = { live:'LIVE', cache:'CACHED', offline_cache:'OFFLINE' }[info.source] || 'CACHED';
+
+    const group = document.createElement('div');
+    group.className = 'cat-group';
+
+    const header = document.createElement('div');
+    header.className = 'cat-header';
+    header.style.borderLeftColor = meta.color || '#888';
+    header.innerHTML = `
+      <span>${meta.icon||'📍'}</span>
+      <span>${meta.label||cat}</span>
+      <span class="src-badge ${srcClass}">${srcText}</span>
+      <span class="cat-count">${info.count}</span>
+      <span style="color:var(--faint);font-size:.7rem">▾</span>
+    `;
+    header.addEventListener('click', () => {
+      list.classList.toggle('open');
+      header.querySelector('span:last-child').textContent = list.classList.contains('open') ? '▴' : '▾';
+    });
+
+    const list = document.createElement('div');
+    list.className = 'svc-list open';
+
+    for (const svc of info.services) {
+      const distClass = svc.distance_km < 2 ? 'near' : svc.distance_km < 5 ? 'mid' : 'far';
+      const card = document.createElement('div');
+      card.className = 'svc-card';
+      card.innerHTML = `
+        <div class="svc-top">
+          <div class="svc-name">${svc.name}</div>
+          <div class="svc-dist ${distClass}">${svc.distance_km}km</div>
+        </div>
+        ${svc.address ? `<div class="svc-addr">${svc.address}</div>` : ''}
+        <div class="svc-actions">
+          ${svc.phone ? `<button class="svc-btn call" onclick="window.location='tel:${svc.phone}'">📞 ${svc.phone}</button>` : ''}
+          <button class="svc-btn nav" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${svc.lat},${svc.lon}','_blank')">🗺️ Navigate</button>
+          <button class="svc-btn share" onclick="shareService('${encodeURIComponent(svc.name)}',${svc.lat},${svc.lon})">↗ Share</button>
+        </div>
+      `;
+      card.addEventListener('click', (e) => {
+        if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+        map.setView([svc.lat, svc.lon], 16, { animate: true });
+      });
+      list.appendChild(card);
+    }
+
+    group.appendChild(header);
+    group.appendChild(list);
+    area.appendChild(group);
+  }
+
+  document.getElementById('results-summary').textContent = `${data.total} services found · ${data.radius}km radius · Tap any service for map view`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// GOLDEN HOUR TIMER
+// ═══════════════════════════════════════════════════════════════════════
+function startGoldenHour() {
+  if (STATE.goldenTimerActive) {
+    stopGoldenHour();
+    return;
+  }
+  STATE.goldenTimerActive = true;
+  STATE.goldenSecondsLeft = 3600;
+  showEl('golden-widget');
+  updateGoldenDisplay();
+
+  STATE.goldenTimerInterval = setInterval(() => {
+    STATE.goldenSecondsLeft--;
+    if (STATE.goldenSecondsLeft <= 0) {
+      stopGoldenHour();
+      toast('Golden Hour has elapsed. Continue emergency care.', 'warn');
+      return;
+    }
+    updateGoldenDisplay();
+  }, 1000);
+  toast('⏱️ Golden Hour timer started', 'success');
+}
+
+function stopGoldenHour() {
+  STATE.goldenTimerActive = false;
+  clearInterval(STATE.goldenTimerInterval);
+  hideEl('golden-widget');
+}
+
+function updateGoldenDisplay() {
+  const s = STATE.goldenSecondsLeft;
+  const mm = String(Math.floor(s / 60)).padStart(2, '0');
+  const ss = String(s % 60).padStart(2, '0');
+  const display = document.getElementById('golden-time-display');
+  const ring = document.getElementById('golden-ring-fill');
+  const CIRC = 251.2;
+  const fraction = s / 3600;
+  const offset = CIRC * (1 - fraction);
+
+  display.textContent = `${mm}:${ss}`;
+  ring.style.strokeDashoffset = offset;
+
+  const isCritical = s < 600; // last 10 min
+  display.className = 'golden-time' + (isCritical ? ' critical' : '');
+  ring.className = 'ring-fill' + (isCritical ? ' critical' : '');
+}
+
+document.getElementById('golden-ring-wrap').addEventListener('click', () => {
+  if (confirm('Stop Golden Hour timer?')) stopGoldenHour();
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// PANIC PANEL — LANGUAGE + DIRECT CALL BUTTONS
+// ═══════════════════════════════════════════════════════════════════════
+const PANIC_LANGS = {
+  en: {
+    ambulance:'Ambulance', police:'Police', fire:'Fire Brigade', hospital:'Nearest Hospital',
+    tap:'Tap to call', share:'Share my location now',
+    better:'Service not responding? Find a better option →'
+  },
+  hi: {
+    ambulance:'एम्बुलेंस', police:'पुलिस', fire:'दमकल', hospital:'नज़दीकी अस्पताल',
+    tap:'कॉल करें', share:'मेरी लोकेशन अभी शेयर करें',
+    better:'सेवा नहीं मिल रही? बेहतर विकल्प खोजें →'
+  },
+  mr: {
+    ambulance:'रुग्णवाहिका', police:'पोलीस', fire:'अग्निशमन', hospital:'जवळचे रुग्णालय',
+    tap:'कॉल करा', share:'माझे स्थान आत्ता शेअर करा',
+    better:'सेवा मिळत नाही? चांगला पर्याय शोधा →'
+  },
+  ta: {
+    ambulance:'ஆம்புலன்ஸ்', police:'போலீஸ்', fire:'தீயணைப்பு', hospital:'அருகில் மருத்துவமனை',
+    tap:'அழைக்க தட்டவும்', share:'என் இடத்தை இப்போது பகிரவும்',
+    better:'சேவை இல்லையா? சிறந்த விருப்பம் கண்டுபிடி →'
+  },
+  bn: {
+    ambulance:'অ্যাম্বুলেন্স', police:'পুলিশ', fire:'দমকল', hospital:'নিকটতম হাসপাতাল',
+    tap:'কল করতে ট্যাপ করুন', share:'এখন আমার অবস্থান শেয়ার করুন',
+    better:'সেবা পাচ্ছেন না? ভালো বিকল্প খুঁজুন →'
+  },
+  te: {
+    ambulance:'యాంబులెన్స్', police:'పోలీస్', fire:'అగ్నిమాపక', hospital:'సమీప ఆసుపత్రి',
+    tap:'కాల్ చేయడానికి నొక్కండి', share:'నా స్థానాన్ని ఇప్పుడు పంచుకోండి',
+    better:'సేవ అందడం లేదా? మెరుగైన ఎంపిక కనుగొనండి →'
+  }
+};
+
+// State→language auto-detect map
+const STATE_LANG_MAP = {
+  'Maharashtra':'mr','Goa':'mr',
+  'Tamil Nadu':'ta','Puducherry':'ta',
+  'West Bengal':'bn',
+  'Telangana':'te','Andhra Pradesh':'te'
+};
+
+function setPanicLang(lang) {
+  document.querySelectorAll('.panic-lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
+  const L = PANIC_LANGS[lang] || PANIC_LANGS.en;
+  const setTxt = (id, t) => { const el = document.getElementById(id); if(el) el.textContent = t; };
+  setTxt('plbl-ambulance', L.ambulance);
+  setTxt('plbl-police',    L.police);
+  setTxt('plbl-fire',      L.fire);
+  setTxt('plbl-hospital',  L.hospital);
+  setTxt('ptap-ambulance', L.tap);
+  setTxt('ptap-police',    L.tap);
+  setTxt('ptap-fire',      L.tap);
+  setTxt('ptap-hospital',  L.tap);
+  setTxt('plbl-share',     L.share);
+  setTxt('plbl-better',    L.better);
+}
+
+function panicCall(type) {
+  const nums = STATE.emergencyNums || {};
+  const defaults = { ambulance:'108', police:'100', fire:'101', general:'112' };
+  const num = nums[type] || defaults[type] || '112';
+  startGoldenHour();
+  window.location = `tel:${num}`;
+  toast(`🆘 Calling ${num}...`, 'error');
+  loadIncidents && loadIncidents();
+}
+
+function showBetterService() {
+  // Expand sheet to show full service search
+  document.getElementById('bottom-sheet').classList.add('expanded');
+  const searchPane = document.querySelector('[data-pane="pane-search"]');
+  if (searchPane) searchPane.click();
+  toast('Finding better services nearby...', 'warn');
+  if (STATE.lat && STATE.lon) setTimeout(() => document.getElementById('search-btn').click(), 300);
+}
+
+// Auto-detect language from geocoded state
+function autoDetectPanicLang(stateName) {
+  if (!stateName) return;
+  for (const [key, lang] of Object.entries(STATE_LANG_MAP)) {
+    if (stateName.includes(key)) { setPanicLang(lang); return; }
+  }
+}
+
+// Legacy: keep showSOSNumbers for crash-detection auto-SOS path
+function showSOSNumbers() {
+  // In the new UI, emergency numbers are always visible as call buttons
+  // Just trigger golden hour
+  startGoldenHour();
+}
+
+// Update displayed emergency numbers when STATE.emergencyNums loads
+function updatePanicNumbers() {
+  const nums = STATE.emergencyNums || {};
+  const setNum = (id, val) => { const el = document.getElementById(id); if(el && val) el.textContent = val; };
+  setNum('pnum-ambulance', nums.ambulance);
+  setNum('pnum-police',    nums.police);
+  setNum('pnum-fire',      nums.fire);
+  setNum('pnum-hospital',  nums.general);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// LOCATION SHARING
+// ═══════════════════════════════════════════════════════════════════════
+async function broadcastLocation() {
+  if (!STATE.lat || !STATE.lon) { toast('Location not available yet', 'warn'); return; }
+
+  const mapsLink = `https://maps.google.com/?q=${STATE.lat},${STATE.lon}`;
+  const waMsg = encodeURIComponent(`🚨 ROAD ACCIDENT — Need Emergency Help!\n\n📍 My Location: ${mapsLink}\n\nPlease call 108 or 112 immediately!\n\n[Sent via ROADSOS Emergency App]`);
+  const waURL = `https://wa.me/?text=${waMsg}`;
+
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: '🚨 Emergency — Road Accident',
+        text: `ROAD ACCIDENT. Need Help! Location: ${mapsLink}`,
+        url: mapsLink,
+      });
+      return;
+    } catch(e) {}
+  }
+  window.open(waURL, '_blank');
+  toast('📡 Location broadcast sent via WhatsApp', 'success');
+}
+
+function shareService(name, lat, lon) {
+  const mapsLink = `https://maps.google.com/?q=${lat},${lon}`;
+  const decoded = decodeURIComponent(name);
+  const msg = encodeURIComponent(`${decoded}\n${mapsLink}`);
+  if (navigator.share) {
+    navigator.share({ title: decoded, url: mapsLink }).catch(()=>{});
+  } else {
+    window.open(`https://wa.me/?text=${msg}`, '_blank');
+  }
+}
+
+document.getElementById('share-btn').addEventListener('click', broadcastLocation);
+
+// ═══════════════════════════════════════════════════════════════════════
+// CRASH DETECTION
+// ═══════════════════════════════════════════════════════════════════════
+const CRASH_THRESHOLD = 20; // m/s²
+let lastAccel = { x: 0, y: 0, z: 0 };
+let crashArmed = false;
+let crashDebounce = false;
+
+function initCrashDetection() {
+  if (!window.DeviceMotionEvent) return;
+  if (typeof DeviceMotionEvent.requestPermission === 'function') {
+    // iOS 13+ — permission needed
+    // We'll request on first interaction
+    return;
+  }
+  window.addEventListener('devicemotion', handleMotion, true);
+  crashArmed = true;
+}
+
+function handleMotion(e) {
+  if (!crashArmed || crashDebounce) return;
+  const a = e.accelerationIncludingGravity;
+  if (!a) return;
+  const delta = Math.sqrt(
+    Math.pow(a.x - lastAccel.x, 2) +
+    Math.pow(a.y - lastAccel.y, 2) +
+    Math.pow(a.z - lastAccel.z, 2)
+  );
+  lastAccel = { x: a.x||0, y: a.y||0, z: a.z||0 };
+  if (delta > CRASH_THRESHOLD) {
+    crashDebounce = true;
+    setTimeout(() => { crashDebounce = false; }, 5000);
+    showCrashOverlay();
+  }
+}
+
+function showCrashOverlay() {
+  STATE.crashCountdown = 10;
+  document.getElementById('crash-count-display').textContent = '10';
+  document.getElementById('crash-ring-fill').style.strokeDashoffset = '0';
+  showEl('crash-overlay', 'show');
+  const CIRC = 220;
+  STATE.crashInterval = setInterval(() => {
+    STATE.crashCountdown--;
+    document.getElementById('crash-count-display').textContent = STATE.crashCountdown;
+    const offset = CIRC * (1 - STATE.crashCountdown / 10);
+    document.getElementById('crash-ring-fill').style.strokeDashoffset = offset;
+    if (STATE.crashCountdown <= 0) {
+      clearInterval(STATE.crashInterval);
+      hideCrashOverlay();
+      triggerAutoSOS();
+    }
+  }, 1000);
+}
+
+function hideCrashOverlay() {
+  hideEl('crash-overlay', 'show');
+  clearInterval(STATE.crashInterval);
+}
+
+function triggerAutoSOS() {
+  showSOSNumbers();
+  startGoldenHour();
+  broadcastLocation();
+  toast('🆘 AUTO SOS triggered — Crash detected!', 'error');
+}
+
+document.getElementById('cancel-crash').addEventListener('click', () => {
+  hideCrashOverlay();
+  toast('Crash alert cancelled — Stay safe!', 'success');
+  crashArmed = false;
+  setTimeout(() => { crashArmed = true; }, 30000); // re-arm after 30s
+});
+document.getElementById('confirm-crash').addEventListener('click', () => {
+  hideCrashOverlay();
+  triggerAutoSOS();
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// FIRST AID
+// ═══════════════════════════════════════════════════════════════════════
+const FA_DATA = {};
+
+async function loadFirstAidMenu() {
+  const grid = document.getElementById('inj-grid');
+  grid.innerHTML = '';
+  try {
+    const res = await fetch('/api/firstaid');
+    const menu = await res.json();
+    for (const [key, item] of Object.entries(menu)) {
+      FA_DATA[key] = item;
+      const card = document.createElement('div');
+      card.className = 'inj-card';
+      card.innerHTML = `
+        <div class="inj-emoji">${item.icon}</div>
+        <div class="inj-name">${item.title}</div>
+        <div class="inj-sev sev-${item.severity}">${item.severity.toUpperCase()}</div>
+      `;
+      card.addEventListener('click', () => showFirstAidSteps(key));
+      grid.appendChild(card);
+    }
+  } catch(e) {
+    grid.innerHTML = '<div style="color:var(--muted);font-size:.78rem;padding:12px">Could not load first aid data.</div>';
+  }
+}
+
+async function showFirstAidSteps(key) {
+  document.getElementById('fa-grid-area').style.display = 'none';
+  const stepsArea = document.getElementById('fa-steps-area');
+  stepsArea.classList.add('show');
+  stepsArea.parentElement.scrollTop = 0;
+
+  try {
+    const res = await fetch(`/api/firstaid/${key}`);
+    const data = await res.json();
+    const content = document.getElementById('fa-guide-content');
+    content.innerHTML = `
+      <div class="fa-guide-title" style="color:${data.color}">${data.icon} ${data.title}</div>
+      <div style="font-size:.72rem;color:var(--muted);margin-bottom:12px">
+        <span class="inj-sev sev-${data.severity}" style="display:inline-block">${data.severity.toUpperCase()}</span>
+        &nbsp;· Always call emergency services (112/108) for serious injuries.
+      </div>
+      ${data.steps.map(step => `
+        <div class="step-card">
+          <div class="step-num">STEP ${step.num}</div>
+          <div class="step-title">${step.title}</div>
+          <div class="step-body">${step.body}</div>
+          ${step.warn ? `<div class="step-warn">${step.warn}</div>` : ''}
+        </div>
+      `).join('')}
+    `;
+  } catch(e) {
+    document.getElementById('fa-guide-content').innerHTML = '<div style="color:var(--muted)">Could not load steps.</div>';
+  }
+}
+
+document.getElementById('fa-back').addEventListener('click', () => {
+  document.getElementById('fa-grid-area').style.display = '';
+  document.getElementById('fa-steps-area').classList.remove('show');
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// INCIDENTS
+// ═══════════════════════════════════════════════════════════════════════
+const INC_ICONS = { accident:'🚗', breakdown:'🔧', pothole:'🕳️', flood:'🌊', debris:'🪨', blocked:'🚧' };
+
+document.querySelectorAll('.inc-type-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.inc-type-btn').forEach(b => b.classList.remove('sel'));
+    btn.classList.add('sel');
+    STATE.selectedIncType = btn.dataset.type;
+  });
+});
+
+document.getElementById('report-btn').addEventListener('click', async () => {
+  if (!STATE.lat || !STATE.lon) { toast('Location not available', 'error'); return; }
+  if (!STATE.selectedIncType) { toast('Select an incident type first', 'warn'); return; }
+  const desc = document.getElementById('inc-desc-input').value.trim();
+  try {
+    await fetch('/api/incidents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat: STATE.lat, lon: STATE.lon, type: STATE.selectedIncType, description: desc })
+    });
+    toast('✅ Incident reported successfully', 'success');
+    document.getElementById('inc-desc-input').value = '';
+    document.querySelectorAll('.inc-type-btn').forEach(b => b.classList.remove('sel'));
+    STATE.selectedIncType = null;
+    loadIncidents();
+  } catch(e) {
+    toast('Failed to report incident', 'error');
+  }
+});
+
+async function loadIncidents() {
+  if (!STATE.lat || !STATE.lon) return;
+  try {
+    const res = await fetch(`/api/incidents?lat=${STATE.lat}&lon=${STATE.lon}&radius=10`);
+    const data = await res.json();
+    renderIncidents(data.incidents || []);
+  } catch(e) {}
+}
+
+function renderIncidents(incidents) {
+  const list = document.getElementById('incidents-list');
+  if (!incidents.length) {
+    list.innerHTML = '<div class="empty-state" style="padding:16px 20px"><p style="font-size:.75rem">No recent incidents reported near you.</p></div>';
+    return;
+  }
+  list.innerHTML = incidents.map(inc => `
+    <div class="inc-card">
+      <div class="inc-icon">${INC_ICONS[inc.type] || '⚠️'}</div>
+      <div class="inc-info">
+        <div class="inc-type-label">${inc.type.charAt(0).toUpperCase() + inc.type.slice(1)}</div>
+        <div class="inc-meta">${inc.distance_km}km away · ${timeAgo(inc.reported_at)}</div>
+        ${inc.description ? `<div class="inc-desc-text">${inc.description}</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function timeAgo(isoStr) {
+  const diff = (Date.now() - new Date(isoStr).getTime()) / 60000;
+  if (diff < 2) return 'just now';
+  if (diff < 60) return Math.floor(diff) + ' min ago';
+  return Math.floor(diff/60) + 'h ago';
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// MEDICAL ID
+// ═══════════════════════════════════════════════════════════════════════
+function loadMedicalID() {
+  try {
+    const saved = localStorage.getItem('roadsos_medid');
+    if (saved) {
+      STATE.medid = JSON.parse(saved);
+      renderMedIDDisplay();
+    }
+  } catch(e) {}
+}
+
+function renderMedIDDisplay() {
+  if (!STATE.medid) return;
+  const m = STATE.medid;
+  const display = document.getElementById('medid-display');
+  const form    = document.getElementById('medid-form');
+  display.style.display = 'block';
+  display.innerHTML = `
+    <div class="medid-display">
+      ${m.name ? `<div class="medid-row"><span class="medid-key">Name</span><span class="medid-val">${m.name}</span></div>` : ''}
+      ${m.blood ? `<div class="medid-row"><span class="medid-key">Blood Type</span><span class="medid-val blood">${m.blood}</span></div>` : ''}
+      ${m.dob   ? `<div class="medid-row"><span class="medid-key">DOB</span><span class="medid-val">${m.dob}</span></div>` : ''}
+      ${m.weight? `<div class="medid-row"><span class="medid-key">Weight</span><span class="medid-val">${m.weight} kg</span></div>` : ''}
+      ${m.allergies ? `<div class="medid-row"><span class="medid-key">Allergies</span><span class="medid-val" style="color:var(--red)">${m.allergies}</span></div>` : ''}
+      ${m.conditions? `<div class="medid-row"><span class="medid-key">Conditions</span><span class="medid-val">${m.conditions}</span></div>` : ''}
+      ${m.meds  ? `<div class="medid-row"><span class="medid-key">Medications</span><span class="medid-val">${m.meds}</span></div>` : ''}
+      ${m.ec1name ? `<div class="medid-row"><span class="medid-key">Emergency 1</span><span class="medid-val"><a href="tel:${m.ec1phone}" style="color:var(--cyan)">${m.ec1name} · ${m.ec1phone}</a></span></div>` : ''}
+      ${m.ec2name ? `<div class="medid-row"><span class="medid-key">Emergency 2</span><span class="medid-val"><a href="tel:${m.ec2phone}" style="color:var(--cyan)">${m.ec2name} · ${m.ec2phone}</a></span></div>` : ''}
+    </div>
+    <button onclick="editMedID()" style="background:var(--card);border:1px solid var(--border2);color:var(--text);border-radius:var(--r-sm);padding:9px 20px;font-size:.82rem;font-weight:600;width:100%;margin-bottom:12px">✏️ Edit Medical ID</button>
+  `;
+  form.style.display = 'none';
+}
+
+function editMedID() {
+  document.getElementById('medid-display').style.display = 'none';
+  document.getElementById('medid-form').style.display = 'block';
+  if (STATE.medid) {
+    const m = STATE.medid;
+    document.getElementById('mid-name').value   = m.name || '';
+    document.getElementById('mid-dob').value    = m.dob || '';
+    document.getElementById('mid-blood').value  = m.blood || '';
+    document.getElementById('mid-weight').value = m.weight || '';
+    document.getElementById('mid-allergies').value  = m.allergies || '';
+    document.getElementById('mid-conditions').value = m.conditions || '';
+    document.getElementById('mid-meds').value       = m.meds || '';
+    document.getElementById('mid-ec1-name').value   = m.ec1name || '';
+    document.getElementById('mid-ec1-phone').value  = m.ec1phone || '';
+    document.getElementById('mid-ec2-name').value   = m.ec2name || '';
+    document.getElementById('mid-ec2-phone').value  = m.ec2phone || '';
+  }
+}
+
+document.getElementById('save-medid').addEventListener('click', () => {
+  const medid = {
+    name: document.getElementById('mid-name').value.trim(),
+    dob:  document.getElementById('mid-dob').value,
+    blood:document.getElementById('mid-blood').value,
+    weight:document.getElementById('mid-weight').value,
+    allergies: document.getElementById('mid-allergies').value.trim(),
+    conditions:document.getElementById('mid-conditions').value.trim(),
+    meds:  document.getElementById('mid-meds').value.trim(),
+    ec1name: document.getElementById('mid-ec1-name').value.trim(),
+    ec1phone:document.getElementById('mid-ec1-phone').value.trim(),
+    ec2name: document.getElementById('mid-ec2-name').value.trim(),
+    ec2phone:document.getElementById('mid-ec2-phone').value.trim(),
+  };
+  try {
+    localStorage.setItem('roadsos_medid', JSON.stringify(medid));
+    STATE.medid = medid;
+    renderMedIDDisplay();
+    toast('💾 Medical ID saved locally', 'success');
+  } catch(e) {
+    toast('Could not save Medical ID', 'error');
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// AI ASSISTANT
+// ═══════════════════════════════════════════════════════════════════════
+// AI Guide — routes through /api/ai on the Flask server (uses free Gemini API)
+async function sendAIMessage(msg) {
+  if (!msg.trim()) return;
+  STATE.aiHistory.push({ role: 'user', content: msg });
+  appendAIMessage('user', msg);
+  document.getElementById('ai-input').value = '';
+  document.getElementById('ai-send').disabled = true;
+  document.getElementById('ai-status').textContent = 'Analyzing emergency...';
+
+  const typingDiv = document.createElement('div');
+  typingDiv.className = 'ai-msg assistant';
+  typingDiv.innerHTML = '<div class="ai-typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
+  document.getElementById('ai-messages').appendChild(typingDiv);
+  scrollAIMessages();
+
+  try {
+    const response = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ history: STATE.aiHistory })
+    });
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+    const reply = data.reply || 'No response received. Please call 112 immediately.';
+    STATE.aiHistory.push({ role: 'assistant', content: reply });
+    typingDiv.remove();
+    appendAIMessage('assistant', reply);
+  } catch(e) {
+    typingDiv.remove();
+    // Full offline fallback — keyword-matched responses from local KB
+    const reply = offlineFallback(msg);
+    STATE.aiHistory.push({ role: 'assistant', content: reply });
+    appendAIMessage('assistant', reply);
+  } finally {
+    document.getElementById('ai-send').disabled = false;
+    document.getElementById('ai-status').textContent = 'Emergency Guide · Free AI (Gemini)';
+  }
+}
+
+// Offline keyword fallback — no API needed at all
+function offlineFallback(msg) {
+  const q = msg.toLowerCase();
+  if (q.includes('bleed')) return '**Severe Bleeding:**\n1. Press firmly on wound with cloth/hand\n2. Do NOT remove — add more cloth on top\n3. Raise the injured limb above heart level\n4. Call 108 immediately';
+  if (q.includes('cpr') || q.includes('breath') || q.includes('unconscious') || q.includes('not breathing'))
+    return '**CPR Steps:**\n1. Check scene is safe\n2. Tap shoulder — "Are you okay?"\n3. Call 108 now\n4. 30 chest compressions — hard & fast (centre of chest)\n5. 2 rescue breaths\n6. Repeat until help arrives';
+  if (q.includes('fracture') || q.includes('broken') || q.includes('bone'))
+    return '**Fracture:**\n1. Do NOT move the injured limb\n2. Immobilise with a makeshift splint (sticks, rolled cloth)\n3. Apply ice wrapped in cloth to reduce swelling\n4. Call 108 — do not try to realign the bone';
+  if (q.includes('burn'))
+    return '**Burns:**\n1. Cool with running water for 10+ minutes\n2. Do NOT use ice, butter, or toothpaste\n3. Cover loosely with clean cloth\n4. For large/deep burns call 108 immediately';
+  if (q.includes('chok'))
+    return '**Choking:**\n1. Ask "Are you choking?" — if they can speak, encourage coughing\n2. If silent: 5 firm back blows between shoulder blades\n3. 5 abdominal thrusts (Heimlich)\n4. Alternate until object dislodges or they lose consciousness';
+  if (q.includes('shock'))
+    return '**Shock:**\n1. Lay person flat, raise legs 30cm (unless spinal injury suspected)\n2. Keep warm with a blanket\n3. Do NOT give food or water\n4. Call 108 — shock is life-threatening';
+  if (q.includes('spine') || q.includes('neck') || q.includes('spinal'))
+    return '**Suspected Spinal Injury:**\n1. **Do NOT move the person** unless in immediate danger\n2. Keep head/neck still — hold it gently with both hands\n3. Call 108 and keep them talking\n4. If unconscious and not breathing, carefully log-roll to recovery position';
+  if (q.includes('head') || q.includes('concuss'))
+    return '**Head Injury:**\n1. Keep person still and calm\n2. If bleeding: gentle pressure (do not press hard on skull)\n3. Watch for: confusion, vomiting, unequal pupils — call 108\n4. Do NOT give painkillers or let them sleep if unconscious';
+  if (q.includes('call') || q.includes('108') || q.includes('112') || q.includes('what to say') || q.includes('tell'))
+    return '**What to say when calling 108/112:**\n1. "There has been a road accident at [location]"\n2. Number of injured people\n3. Condition — conscious? breathing?\n4. Your phone number\n5. Stay on the line — they will guide you';
+  if (q.includes('accident') || q.includes('crash'))
+    return '**Immediately after a road accident:**\n1. Check yourself first — are YOU injured?\n2. Call 108 (ambulance) + 100 (police)\n3. Do NOT move injured people unless fire/danger\n4. Use ROADSOS to find the nearest hospital\n5. Share your location via the Share button';
+  return '⚠️ AI server offline.\n\n**Call 108** (ambulance) or **112** (emergency) immediately.\n\nUse the **First Aid tab** for step-by-step offline guides on bleeding, CPR, fractures, burns, and more.';
+}
+
+function appendAIMessage(role, text) {
+  const div = document.createElement('div');
+  div.className = `ai-msg ${role}`;
+  const formatted = text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>');
+  div.innerHTML = `<div class="msg-bubble">${formatted}</div>`;
+  document.getElementById('ai-messages').appendChild(div);
+  scrollAIMessages();
+}
+
+function scrollAIMessages() {
+  const msgs = document.getElementById('ai-messages');
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+document.getElementById('ai-send').addEventListener('click', () => {
+  sendAIMessage(document.getElementById('ai-input').value);
+});
+document.getElementById('ai-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendAIMessage(document.getElementById('ai-input').value);
+  }
+});
+document.querySelectorAll('.qprompt').forEach(btn => {
+  btn.addEventListener('click', () => sendAIMessage(btn.dataset.q));
+});
+document.getElementById('ai-btn').addEventListener('click', () => {
+  showEl('ai-modal', 'show');
+  scrollAIMessages();
+});
+document.getElementById('close-ai').addEventListener('click', () => hideEl('ai-modal', 'show'));
+
+// ═══════════════════════════════════════════════════════════════════════
+// UI CONTROLS
+// ═══════════════════════════════════════════════════════════════════════
+document.querySelectorAll('.stab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.stab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.sheet-pane').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.pane).classList.add('active');
+  });
+});
+
+document.getElementById('sheet-handle').addEventListener('click', () => {
+  STATE.sheetExpanded = !STATE.sheetExpanded;
+  document.getElementById('bottom-sheet').classList.toggle('expanded', STATE.sheetExpanded);
+  map.invalidateSize();
+});
+
+document.getElementById('radius-slider').addEventListener('input', e => {
+  STATE.searchRadius = parseInt(e.target.value);
+  document.getElementById('radius-val').textContent = STATE.searchRadius;
+});
+
+document.getElementById('search-btn').addEventListener('click', doSearch);
+document.getElementById('locate-btn').addEventListener('click', locateMeWithFeedback);
+document.getElementById('loc-display').addEventListener('click', () => {
+  if (!STATE.lat) locateMeWithFeedback();
+});
+document.getElementById('medid-topbtn').addEventListener('click', () => showEl('medid-modal', 'show'));
+document.getElementById('close-medid').addEventListener('click', () => hideEl('medid-modal', 'show'));
+document.getElementById('grant-loc').addEventListener('click', locateMe);
+
+// ═══════════════════════════════════════════════════════════════════════
+// NETWORK STATUS
+// ═══════════════════════════════════════════════════════════════════════
+function updateNetBadge() {
+  const badge = document.getElementById('net-badge');
+  if (navigator.onLine) {
+    badge.textContent = '● ONLINE';
+    badge.className = 'online';
+  } else {
+    badge.textContent = '⚠ OFFLINE';
+    badge.className = 'offline';
+    toast('You are offline. Cached data will be used.', 'warn');
+  }
+}
+window.addEventListener('online',  updateNetBadge);
+window.addEventListener('offline', updateNetBadge);
+updateNetBadge();
+
+// ═══════════════════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════════════════
+function showEl(id, cls) { const el=document.getElementById(id); if(cls){el.classList.add(cls);}else{el.style.display='flex';} }
+function hideEl(id, cls) { const el=document.getElementById(id); if(cls){el.classList.remove(cls);}else{el.style.display='none';} }
+
+let toastTimeout = null;
+function toast(msg, type='') {
+  const wrap = document.getElementById('toast-wrap');
+  const div = document.createElement('div');
+  div.className = `toast ${type}`;
+  div.textContent = msg;
+  wrap.appendChild(div);
+  setTimeout(() => { div.style.opacity = '0'; setTimeout(() => div.remove(), 300); }, 3000);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SERVICE WORKER
+// ═══════════════════════════════════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/sw.js').catch(()=>{});
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════════
+function init() {
+  initChips();
+  loadMedicalID();
+  loadFirstAidMenu();
+  initCrashDetection();
+
+  // iOS motion permission
+  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+    document.getElementById('grant-loc').addEventListener('click', () => {
+      DeviceMotionEvent.requestPermission().then(result => {
+        if (result === 'granted') {
+          window.addEventListener('devicemotion', handleMotion, true);
+          crashArmed = true;
+        }
+      }).catch(()=>{});
+    });
+  }
+
+  // Auto-locate — always dismiss loading screen regardless of GPS outcome
+  const dismissOverlay = () => {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) { overlay.classList.add('hide'); setTimeout(() => { overlay.style.display = 'none'; }, 600); }
+  };
+
+  // Hard dismiss after 4s no matter what
+  setTimeout(dismissOverlay, 4000);
+
+  setTimeout(() => {
+    try {
+      if (!navigator.geolocation) {
+        useDefaultLocation();
+        setTimeout(dismissOverlay, 500);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          setLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+          setFabState('located');
+          showBanner(false);
+          dismissOverlay();
+        },
+        err => {
+          // Show banner and try IP fallback
+          setTimeout(() => showBanner(true), 500);
+          useDefaultLocation();
+          dismissOverlay();
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+      );
+    } catch(e) {
+      dismissOverlay();
+    }
+  }, 400);
+}
+
+init();
+</script>
+</body>
+</html>
