@@ -296,36 +296,68 @@ AI_SYSTEM = (
 
 @app.route("/api/ai", methods=["POST"])
 def api_ai():
-    GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
-    if not GEMINI_KEY:
-        return jsonify({"error": "GEMINI_API_KEY not set"}), 503
+    ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+    GEMINI_KEY    = os.environ.get("GEMINI_API_KEY", "")
 
     data = request.get_json() or {}
     history = data.get("history", [])
     if not history:
         return jsonify({"error": "No history provided"}), 400
 
-    contents = []
-    for turn in history:
-        role = "user" if turn["role"] == "user" else "model"
-        contents.append({"role": role, "parts": [{"text": turn["content"]}]})
+    # --- Anthropic (Claude) ---
+    if ANTHROPIC_KEY:
+        messages = [
+            {"role": t["role"], "content": t["content"]}
+            for t in history
+            if t["role"] in ("user", "assistant")
+        ]
+        payload = {
+            "model": "claude-haiku-4-5-20251001",
+            "max_tokens": 512,
+            "system": AI_SYSTEM,
+            "messages": messages,
+        }
+        try:
+            r = req_lib.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": ANTHROPIC_KEY,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json=payload,
+                timeout=15,
+            )
+            r.raise_for_status()
+            reply = r.json()["content"][0]["text"]
+            return jsonify({"reply": reply})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 502
 
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
-    )
-    payload = {
-        "system_instruction": {"parts": [{"text": AI_SYSTEM}]},
-        "contents": contents,
-        "generationConfig": {"maxOutputTokens": 400, "temperature": 0.4}
-    }
-    try:
-        r = req_lib.post(url, json=payload, timeout=10)
-        r.raise_for_status()
-        reply = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-        return jsonify({"reply": reply})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 502
+    # --- Gemini fallback ---
+    if GEMINI_KEY:
+        contents = []
+        for turn in history:
+            role = "user" if turn["role"] == "user" else "model"
+            contents.append({"role": role, "parts": [{"text": turn["content"]}]})
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            f"gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
+        )
+        payload = {
+            "system_instruction": {"parts": [{"text": AI_SYSTEM}]},
+            "contents": contents,
+            "generationConfig": {"maxOutputTokens": 400, "temperature": 0.4},
+        }
+        try:
+            r = req_lib.post(url, json=payload, timeout=10)
+            r.raise_for_status()
+            reply = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+            return jsonify({"reply": reply})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 502
+
+    return jsonify({"error": "No AI key configured. Set ANTHROPIC_API_KEY or GEMINI_API_KEY."}), 503
 
 
 @app.route("/api/health")
