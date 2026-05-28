@@ -4,6 +4,7 @@ import json
 import math
 import os
 import secrets
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 
@@ -443,28 +444,41 @@ def fetch_from_osm(lat, lon, radius_m, category):
     return None
 
 
+def _fetch_category(cat, lat, lon, radius_km, radius_m, region_key, force_refresh, db_path):
+    use_cache = is_cache_valid(region_key, cat, db_path) and not force_refresh
+    if use_cache:
+        data   = get_from_cache(region_key, cat, lat, lon, radius_km, db_path)
+        source = "cache"
+    else:
+        live = fetch_from_osm(lat, lon, radius_m, cat)
+        if live is not None:
+            save_to_cache(live, region_key, cat, db_path)
+            data   = get_from_cache(region_key, cat, lat, lon, radius_km, db_path)
+            source = "live"
+        else:
+            data   = get_from_cache(region_key, cat, lat, lon, radius_km, db_path)
+            source = "offline_cache"
+    return cat, {"data": data, "source": source, "count": len(data)}
+
+
 def get_nearby_services(lat, lon, radius_km=5.0, categories=None, force_refresh=False, db_path=DB_PATH):
     if categories is None:
         categories = list(SERVICE_QUERIES.keys())
     radius_m   = int(radius_km * 1000)
     region_key = get_region_key(lat, lon, radius_km)
-    output     = {}
-    for cat in sorted(categories, key=lambda c: CATEGORY_INFO.get(c,{}).get("priority",99)):
-        use_cache = is_cache_valid(region_key, cat, db_path) and not force_refresh
-        if use_cache:
-            data   = get_from_cache(region_key, cat, lat, lon, radius_km, db_path)
-            source = "cache"
-        else:
-            live = fetch_from_osm(lat, lon, radius_m, cat)
-            if live is not None:
-                save_to_cache(live, region_key, cat, db_path)
-                data   = get_from_cache(region_key, cat, lat, lon, radius_km, db_path)
-                source = "live"
-            else:
-                data   = get_from_cache(region_key, cat, lat, lon, radius_km, db_path)
-                source = "offline_cache"
-        output[cat] = {"data": data, "source": source, "count": len(data)}
-    return output
+
+    output = {}
+    with ThreadPoolExecutor(max_workers=min(len(categories), 8)) as pool:
+        futures = {
+            pool.submit(_fetch_category, cat, lat, lon, radius_km, radius_m, region_key, force_refresh, db_path): cat
+            for cat in categories
+        }
+        for future in as_completed(futures):
+            cat, result = future.result()
+            output[cat] = result
+
+    sorted_cats = sorted(categories, key=lambda c: CATEGORY_INFO.get(c, {}).get("priority", 99))
+    return {cat: output[cat] for cat in sorted_cats if cat in output}
 
 
 def get_emergency_numbers(country_code="IN", db_path=DB_PATH):
