@@ -331,6 +331,40 @@ def api_ai():
                 pass
             return jsonify({"error": str(e)}), 502
 
+    # --- Groq (fast free tier) ---
+    GROQ_KEY = os.environ.get("GROQ_API_KEY", "")
+    if GROQ_KEY:
+        messages = [{"role": "system", "content": AI_SYSTEM}]
+        for turn in history:
+            if turn["role"] in ("user", "assistant"):
+                messages.append({"role": turn["role"], "content": turn["content"]})
+        payload = {
+            "model": "llama-3.1-8b-instant",
+            "messages": messages,
+            "max_tokens": 400,
+            "temperature": 0.4,
+        }
+        try:
+            r = req_lib.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {GROQ_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+                timeout=15,
+            )
+            r.raise_for_status()
+            reply = r.json()["choices"][0]["message"]["content"]
+            return jsonify({"reply": reply})
+        except Exception as e:
+            print(f"Groq error: {e}", flush=True)
+            try:
+                print(f"Groq response: {r.text}", flush=True)
+            except:
+                pass
+            return jsonify({"error": str(e)}), 502
+
     # --- Gemini fallback ---
     if GEMINI_KEY:
         contents = []
@@ -359,7 +393,7 @@ def api_ai():
                 pass
             return jsonify({"error": str(e)}), 502
 
-    return jsonify({"error": "No AI key configured. Set ANTHROPIC_API_KEY or GEMINI_API_KEY."}), 503
+    return jsonify({"error": "No AI key configured. Set GROQ_API_KEY or GEMINI_API_KEY."}), 503
 
 
 @app.route("/api/health")
