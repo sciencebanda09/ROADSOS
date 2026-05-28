@@ -342,7 +342,7 @@ def api_ai():
             contents.append({"role": role, "parts": [{"text": turn["content"]}]})
         url = (
             "https://generativelanguage.googleapis.com/v1beta/models/"
-            f"gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
+            f"gemini-2.0-flash:generateContent?key={GEMINI_KEY}"
         )
         payload = {
             "system_instruction": {"parts": [{"text": AI_SYSTEM}]},
