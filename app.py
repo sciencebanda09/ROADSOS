@@ -29,7 +29,6 @@ APP_VERSION = "3.1.0"
 ALLOWED_INC_TYPES = {"accident", "breakdown", "pothole", "flood", "debris", "blocked"}
 
 def strip_html(text: str) -> str:
-    """Remove HTML tags and strip whitespace."""
     clean = re.sub(r'<[^>]+>', '', text)
     return clean.strip()
 
@@ -141,14 +140,9 @@ def api_report_incident():
         desc  = str(data.get("description", ""))
     except (KeyError, TypeError, ValueError):
         return jsonify({"error": "lat, lon, type required"}), 400
-
-    # Fix #3: validate type
     if itype not in ALLOWED_INC_TYPES:
         return jsonify({"error": f"type must be one of: {', '.join(sorted(ALLOWED_INC_TYPES))}"}), 400
-
-    # Fix #3: sanitize and cap description
     desc = strip_html(desc)[:300]
-
     report_incident(lat, lon, itype, desc, DB)
     return jsonify({"status": "reported"})
 
@@ -169,7 +163,6 @@ def api_share():
         "sms_body":  f"🚨 ROAD ACCIDENT - Need Help! Location: {maps_link}",
         "coords":    {"lat": lat, "lon": lon}
     })
-
 
 
 @app.route("/api/track", methods=["POST"])
@@ -215,7 +208,6 @@ def api_delete_track(token):
 
 @app.route("/track/<token>")
 def view_track(token):
-    """Serve a minimal live-tracking page for a given token."""
     track = get_track(token, DB)
     if not track:
         return "<h2 style='font-family:sans-serif;color:#888'>This tracking link has expired or is invalid.</h2>", 404
@@ -270,7 +262,7 @@ def view_track(token):
           marker.setLatLng([d.lat,d.lon]);
           map.panTo([d.lat,d.lon]);
           const ago = Math.round((Date.now()-new Date(d.updated_at+'Z').getTime())/1000);
-          document.getElementById('status').textContent = ago<5?'Just updated':`${ago}s ago`;
+          document.getElementById('status').textContent = ago<5?'Just updated':`${{ago}}s ago`;
         }}).catch(()=>{{ document.getElementById('status').textContent='Connection lost'; }});
     }}
     refresh();
@@ -332,6 +324,11 @@ def api_ai():
             reply = r.json()["content"][0]["text"]
             return jsonify({"reply": reply})
         except Exception as e:
+            print(f"Anthropic error: {e}", flush=True)
+            try:
+                print(f"Anthropic response: {r.text}", flush=True)
+            except:
+                pass
             return jsonify({"error": str(e)}), 502
 
     # --- Gemini fallback ---
@@ -355,6 +352,11 @@ def api_ai():
             reply = r.json()["candidates"][0]["content"]["parts"][0]["text"]
             return jsonify({"reply": reply})
         except Exception as e:
+            print(f"Gemini error: {e}", flush=True)
+            try:
+                print(f"Gemini response: {r.text}", flush=True)
+            except:
+                pass
             return jsonify({"error": str(e)}), 502
 
     return jsonify({"error": "No AI key configured. Set ANTHROPIC_API_KEY or GEMINI_API_KEY."}), 503
