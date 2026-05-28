@@ -164,8 +164,6 @@ python -c "from py_vapid import Vapid; v=Vapid(); v.generate_keys(); print('VAPI
 python app.py
 ```
 
-Open `http://localhost:5000` — that's it.
-
 ---
 
 ## CLI Tool
