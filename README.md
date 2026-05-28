@@ -1,10 +1,4 @@
-# 
-██████╗  ██████╗  █████╗ ██████╗ ███████╗ ██████╗ ███████╗
-██╔══██╗██╔═══██╗██╔══██╗██╔══██╗██╔════╝██╔═══██╗██╔════╝
-██████╔╝██║   ██║███████║██║  ██║███████╗██║   ██║███████╗
-██╔══██╗██║   ██║██╔══██║██║  ██║╚════██║██║   ██║╚════██║
-██║  ██║╚██████╔╝██║  ██║██████╔╝███████║╚██████╔╝███████║
-╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═════╝ ╚══════╝ ╚═════╝ ╚══════╝
+# 🚨 ROADSOS
 ### Road Accident Emergency Services Locator- Next Generation
 
 > The **life-saving** upgrade: crash detection, Golden Hour timer, AI emergency guide, Medical ID, and real-time location broadcast all working offline.
