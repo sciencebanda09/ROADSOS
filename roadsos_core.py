@@ -238,7 +238,29 @@ def init_db(db_path=DB_PATH):
             type        TEXT NOT NULL,
             description TEXT DEFAULT '',
             reported_at TEXT NOT NULL,
-            active      INTEGER DEFAULT 1
+            expires_at  TEXT,
+            active      INTEGER DEFAULT 1,
+            upvotes     INTEGER DEFAULT 0,
+            photo_path  TEXT    DEFAULT ''
+        )
+    """)
+    # Migrate older DBs that lack new columns
+    for col, definition in [
+        ("expires_at", "TEXT"),
+        ("upvotes",    "INTEGER DEFAULT 0"),
+        ("photo_path", "TEXT DEFAULT ''"),
+    ]:
+        try:
+            c.execute(f"ALTER TABLE incidents ADD COLUMN {col} {definition}")
+        except Exception:
+            pass  # Column already exists
+
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+            endpoint   TEXT PRIMARY KEY,
+            p256dh     TEXT NOT NULL,
+            auth       TEXT NOT NULL,
+            created_at TEXT NOT NULL
         )
     """)
     # Live tracking table — expires after 2 hrs
@@ -327,6 +349,7 @@ def init_db(db_path=DB_PATH):
     c.execute("CREATE INDEX IF NOT EXISTS idx_svc_latlon   ON services(lat, lon)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_svc_category ON services(category)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_inc_latlon   ON incidents(lat, lon)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_inc_active   ON incidents(active, expires_at)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_tracks_token ON live_tracks(token)")
 
     conn.commit()
@@ -524,12 +547,15 @@ def reverse_geocode(lat, lon):
         return {"display_name":"","country_code":"IN","city":"","country":"","road":"","state":""}
 
 
-def report_incident(lat, lon, inc_type, description="", db_path=DB_PATH):
+def report_incident(lat, lon, inc_type, description="", db_path=DB_PATH,
+                    expires_hours=6, photo_path=""):
     conn = sqlite3.connect(db_path)
     now  = datetime.now().isoformat()
+    expires_at = (datetime.now() + timedelta(hours=expires_hours)).isoformat()
     conn.execute(
-        "INSERT INTO incidents (lat,lon,type,description,reported_at,active) VALUES (?,?,?,?,?,1)",
-        (lat, lon, inc_type, description, now)
+        "INSERT INTO incidents (lat,lon,type,description,reported_at,expires_at,active,upvotes,photo_path) "
+        "VALUES (?,?,?,?,?,?,1,0,?)",
+        (lat, lon, inc_type, description, now, expires_at, photo_path)
     )
     conn.commit()
     conn.close()
@@ -537,11 +563,13 @@ def report_incident(lat, lon, inc_type, description="", db_path=DB_PATH):
 
 def get_incidents(lat, lon, radius_km=5.0, db_path=DB_PATH):
     conn    = sqlite3.connect(db_path)
-    cutoff  = (datetime.now() - timedelta(hours=6)).isoformat()
+    now_iso = datetime.now().isoformat()
     rows    = conn.execute(
-        "SELECT id,lat,lon,type,description,reported_at FROM incidents "
-        "WHERE active=1 AND reported_at > ? ORDER BY reported_at DESC",
-        (cutoff,)
+        "SELECT id,lat,lon,type,description,reported_at,upvotes,photo_path,expires_at "
+        "FROM incidents "
+        "WHERE active=1 AND (expires_at IS NULL OR expires_at > ?) "
+        "ORDER BY reported_at DESC",
+        (now_iso,)
     ).fetchall()
     conn.close()
     results = []
@@ -549,8 +577,12 @@ def get_incidents(lat, lon, radius_km=5.0, db_path=DB_PATH):
         dist = haversine(lat, lon, r[1], r[2])
         if dist <= radius_km:
             results.append({
-                "id":r[0],"lat":r[1],"lon":r[2],"type":r[3],
-                "description":r[4],"reported_at":r[5],"distance_km":round(dist,2)
+                "id":          r[0], "lat": r[1], "lon": r[2], "type": r[3],
+                "description": r[4], "reported_at": r[5],
+                "upvotes":     r[6] or 0,
+                "photo_path":  r[7] or "",
+                "expires_at":  r[8],
+                "distance_km": round(dist, 2),
             })
     return sorted(results, key=lambda x: x["distance_km"])
 
@@ -614,3 +646,68 @@ def get_first_aid(injury_type=None):
     if injury_type and injury_type in FIRST_AID_DATA:
         return FIRST_AID_DATA[injury_type]
     return FIRST_AID_DATA
+
+
+# ── Incident community features ────────────────────────────────────────────────
+
+def upvote_incident(incident_id: int, db_path=DB_PATH) -> bool:
+    """Increment upvote count for an active incident. Returns True if updated."""
+    conn = sqlite3.connect(db_path)
+    now_iso = datetime.now().isoformat()
+    cur = conn.execute(
+        "UPDATE incidents SET upvotes = upvotes + 1 "
+        "WHERE id=? AND active=1 AND (expires_at IS NULL OR expires_at > ?)",
+        (incident_id, now_iso)
+    )
+    conn.commit()
+    ok = cur.rowcount > 0
+    conn.close()
+    return ok
+
+
+def auto_expire_incidents(db_path=DB_PATH) -> int:
+    """Mark all incidents whose expires_at has passed as inactive. Returns count."""
+    conn = sqlite3.connect(db_path)
+    now_iso = datetime.now().isoformat()
+    cur = conn.execute(
+        "UPDATE incidents SET active=0 "
+        "WHERE active=1 AND expires_at IS NOT NULL AND expires_at <= ?",
+        (now_iso,)
+    )
+    conn.commit()
+    count = cur.rowcount
+    conn.close()
+    return count
+
+
+# ── Push notification subscriptions ───────────────────────────────────────────
+
+def store_push_subscription(endpoint: str, p256dh: str, auth: str, db_path=DB_PATH):
+    """Upsert a Web Push subscription."""
+    conn = sqlite3.connect(db_path)
+    now  = datetime.now().isoformat()
+    conn.execute(
+        "INSERT OR REPLACE INTO push_subscriptions (endpoint, p256dh, auth, created_at) "
+        "VALUES (?,?,?,?)",
+        (endpoint, p256dh, auth, now)
+    )
+    conn.commit()
+    conn.close()
+
+
+def remove_push_subscription(endpoint: str, db_path=DB_PATH):
+    """Delete a subscription (called when push delivery fails with 410)."""
+    conn = sqlite3.connect(db_path)
+    conn.execute("DELETE FROM push_subscriptions WHERE endpoint=?", (endpoint,))
+    conn.commit()
+    conn.close()
+
+
+def get_all_push_subscriptions(db_path=DB_PATH) -> list:
+    """Return all stored subscriptions."""
+    conn = sqlite3.connect(db_path)
+    rows = conn.execute(
+        "SELECT endpoint, p256dh, auth FROM push_subscriptions"
+    ).fetchall()
+    conn.close()
+    return [{"endpoint": r[0], "p256dh": r[1], "auth": r[2]} for r in rows]

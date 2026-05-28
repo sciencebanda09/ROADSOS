@@ -1,12 +1,17 @@
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response, send_from_directory
 from roadsos_core import (
     init_db, get_nearby_services, get_emergency_numbers, get_all_emergency_numbers,
     reverse_geocode, CATEGORY_INFO, SERVICE_QUERIES, DB_PATH,
     report_incident, get_incidents, get_first_aid, FIRST_AID_DATA,
-    create_track, update_track, get_track, delete_track
+    create_track, update_track, get_track, delete_track,
+    upvote_incident, auto_expire_incidents,
+    store_push_subscription, remove_push_subscription, get_all_push_subscriptions,
 )
 import os
 import re
+import base64
+import json
+import secrets
 import requests as req_lib
 from dotenv import load_dotenv
 from flask_limiter import Limiter
@@ -24,9 +29,19 @@ limiter = Limiter(
     storage_uri="memory://"
 )
 
-APP_VERSION = "3.1.0"
+APP_VERSION = "3.2.0"
 
 ALLOWED_INC_TYPES = {"accident", "breakdown", "pothole", "flood", "debris", "blocked"}
+
+# Incident photo storage
+PHOTO_DIR = os.path.join(os.path.dirname(__file__), "static", "incident_photos")
+os.makedirs(PHOTO_DIR, exist_ok=True)
+MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 5 MB
+
+# VAPID keys for Web Push (generate once: python -c "from py_vapid import Vapid; v=Vapid(); v.generate_keys(); print(v.private_pem().decode()); print(v.public_key)")
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_PUBLIC_KEY  = os.environ.get("VAPID_PUBLIC_KEY",  "")
+VAPID_CLAIMS      = {"sub": os.environ.get("VAPID_MAILTO", "mailto:admin@roadsos.app")}
 
 def strip_html(text: str) -> str:
     clean = re.sub(r'<[^>]+>', '', text)
@@ -132,7 +147,7 @@ def api_get_incidents():
 @app.route("/api/incidents", methods=["POST"])
 @limiter.limit("5 per hour")
 def api_report_incident():
-    data = request.get_json()
+    data = request.get_json() or {}
     try:
         lat   = float(data["lat"])
         lon   = float(data["lon"])
@@ -143,8 +158,63 @@ def api_report_incident():
     if itype not in ALLOWED_INC_TYPES:
         return jsonify({"error": f"type must be one of: {', '.join(sorted(ALLOWED_INC_TYPES))}"}), 400
     desc = strip_html(desc)[:300]
-    report_incident(lat, lon, itype, desc, DB)
+
+    # Optional: expires_hours override (1–48)
+    try:
+        expires_hours = max(1, min(48, int(data.get("expires_hours", 6))))
+    except (TypeError, ValueError):
+        expires_hours = 6
+
+    # Optional: base64-encoded photo (JPEG or PNG, max 5 MB)
+    photo_filename = ""
+    photo_b64 = data.get("photo")
+    if photo_b64:
+        try:
+            # Strip data-URI prefix if present
+            if "," in photo_b64:
+                photo_b64 = photo_b64.split(",", 1)[1]
+            photo_bytes = base64.b64decode(photo_b64)
+            if len(photo_bytes) > MAX_PHOTO_BYTES:
+                return jsonify({"error": "Photo exceeds 5 MB limit"}), 413
+            # Detect image type by magic bytes
+            if photo_bytes[:3] == b"\xff\xd8\xff":
+                ext = "jpg"
+            elif photo_bytes[:8] == b"\x89PNG\r\n\x1a\n":
+                ext = "png"
+            else:
+                return jsonify({"error": "Only JPEG and PNG photos are accepted"}), 415
+            photo_filename = f"{secrets.token_hex(12)}.{ext}"
+            with open(os.path.join(PHOTO_DIR, photo_filename), "wb") as f:
+                f.write(photo_bytes)
+        except Exception as e:
+            return jsonify({"error": f"Photo processing failed: {e}"}), 400
+
+    report_incident(lat, lon, itype, desc, DB,
+                    expires_hours=expires_hours, photo_path=photo_filename)
+
+    # Auto-expire stale incidents on each new report (cheap maintenance)
+    auto_expire_incidents(DB)
+
+    # Push notification to subscribers for serious incident types
+    serious = {"accident", "flood", "blocked"}
+    if itype in serious and VAPID_PRIVATE_KEY and VAPID_PUBLIC_KEY:
+        _send_push_notifications(itype, desc, lat, lon)
+
     return jsonify({"status": "reported"})
+
+
+@app.route("/api/incidents/<int:inc_id>/upvote", methods=["POST"])
+@limiter.limit("30 per hour")
+def api_upvote_incident(inc_id):
+    ok = upvote_incident(inc_id, DB)
+    if not ok:
+        return jsonify({"error": "Incident not found, expired, or already resolved"}), 404
+    return jsonify({"status": "upvoted"})
+
+
+@app.route("/static/incident_photos/<path:filename>")
+def incident_photo(filename):
+    return send_from_directory(PHOTO_DIR, filename)
 
 @app.route("/api/share")
 def api_share():
@@ -276,6 +346,72 @@ def view_track(token):
 @app.route("/api/version")
 def api_version():
     return jsonify({"version": APP_VERSION})
+
+
+# ── Web Push ──────────────────────────────────────────────────────────────────
+
+def _send_push_notifications(inc_type: str, description: str, lat: float, lon: float):
+    """Fire-and-forget: push a notification to all stored subscribers."""
+    try:
+        from pywebpush import webpush, WebPushException
+    except ImportError:
+        return  # pywebpush not installed; silently skip
+
+    subscriptions = get_all_push_subscriptions(DB)
+    payload = json.dumps({
+        "title": f"⚠️ {inc_type.capitalize()} reported nearby",
+        "body":  description or f"A {inc_type} was reported near {lat:.4f}, {lon:.4f}",
+        "icon":  "/static/manifest.json",
+        "lat":   lat,
+        "lon":   lon,
+    })
+    dead = []
+    for sub in subscriptions:
+        try:
+            webpush(
+                subscription_info={
+                    "endpoint": sub["endpoint"],
+                    "keys": {"p256dh": sub["p256dh"], "auth": sub["auth"]},
+                },
+                data=payload,
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims=VAPID_CLAIMS,
+            )
+        except Exception as e:
+            status = getattr(getattr(e, "response", None), "status_code", None)
+            if status in (404, 410):
+                dead.append(sub["endpoint"])
+    for ep in dead:
+        remove_push_subscription(ep, DB)
+
+
+@app.route("/api/push/vapid-public-key")
+def api_vapid_key():
+    if not VAPID_PUBLIC_KEY:
+        return jsonify({"error": "Push notifications not configured"}), 503
+    return jsonify({"key": VAPID_PUBLIC_KEY})
+
+
+@app.route("/api/push/subscribe", methods=["POST"])
+def api_push_subscribe():
+    data = request.get_json() or {}
+    endpoint = data.get("endpoint", "").strip()
+    keys     = data.get("keys", {})
+    p256dh   = keys.get("p256dh", "").strip()
+    auth     = keys.get("auth", "").strip()
+    if not (endpoint and p256dh and auth):
+        return jsonify({"error": "endpoint, keys.p256dh and keys.auth are required"}), 400
+    store_push_subscription(endpoint, p256dh, auth, DB)
+    return jsonify({"status": "subscribed"})
+
+
+@app.route("/api/push/unsubscribe", methods=["POST"])
+def api_push_unsubscribe():
+    data     = request.get_json() or {}
+    endpoint = data.get("endpoint", "").strip()
+    if endpoint:
+        remove_push_subscription(endpoint, DB)
+    return jsonify({"status": "unsubscribed"})
 
 
 AI_SYSTEM = (

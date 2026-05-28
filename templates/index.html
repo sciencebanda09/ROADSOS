@@ -432,7 +432,21 @@
     .inc-desc:focus { border-color: var(--cyan); }
     #report-btn { width: 100%; background: var(--red-dim); border: 1px solid var(--red); color: var(--text); border-radius: var(--r-sm); padding: 11px; font-size: .84rem; font-weight: 700; letter-spacing: .4px; transition: all .15s; min-height: 44px; }
     #report-btn:hover { background: var(--red); }
+    .photo-row { display:flex; gap:8px; align-items:center; margin-bottom:6px; }
+    #photo-capture-btn { background:var(--card2); border:1px solid var(--border2); color:var(--text2); border-radius:var(--r-sm); padding:9px 12px; font-size:.8rem; flex-shrink:0; transition:all .15s; min-height:40px; cursor:pointer; }
+    #photo-capture-btn.has-photo { border-color:var(--green); color:var(--green); background:var(--green-dim); }
+    #photo-preview { width:44px; height:44px; border-radius:var(--r-sm); object-fit:cover; display:none; border:1px solid var(--border2); }
+    #photo-clear-btn { display:none; background:none; border:none; color:var(--muted); font-size:.75rem; cursor:pointer; padding:0 4px; }
+    .inc-photo-thumb { width:100%; max-height:140px; object-fit:cover; border-radius:var(--r-sm); margin-top:6px; border:1px solid var(--border); }
+    .battery-badge { font-size:.65rem; background:var(--green-dim); border:1px solid var(--green); color:var(--green); border-radius:4px; padding:1px 5px; vertical-align:middle; margin-left:4px; display:none; }
+    .battery-badge.low { background:var(--amber-dim); border-color:var(--amber); color:var(--amber); }
+    #push-bell-btn { background:none; border:1px solid var(--border2); color:var(--muted); border-radius:var(--r-sm); padding:6px 10px; font-size:.75rem; cursor:pointer; transition:all .15s; white-space:nowrap; }
+    #push-bell-btn.active { border-color:var(--cyan); color:var(--cyan); background:var(--cyan-dim); }
     .inc-card { background: var(--card); border-radius: var(--r-sm); padding: 12px 13px; margin-bottom: 7px; border-left: 3px solid var(--amber); display: flex; gap: 10px; align-items: flex-start; }
+    .inc-upvote { margin-left:auto; display:flex; flex-direction:column; align-items:center; gap:2px; flex-shrink:0; }
+    .inc-upvote-btn { background: var(--card2); border: 1px solid var(--border2); color: var(--muted); border-radius: var(--r-sm); width:36px; height:36px; font-size:.85rem; cursor:pointer; transition: all .15s; display:flex; align-items:center; justify-content:center; }
+    .inc-upvote-btn:active, .inc-upvote-btn.voted { background: var(--amber-dim); border-color: var(--amber); color: var(--amber); }
+    .inc-upvote-count { font-size:.65rem; color:var(--muted); font-weight:600; text-align:center; }
     .inc-icon { font-size: 1.4rem; flex-shrink: 0; }
     .inc-type-label { font-size: .8rem; font-weight: 600; }
     .inc-meta { font-size: .65rem; color: var(--muted); margin-top: 3px; font-family: var(--font-mono); }
@@ -855,10 +869,20 @@
             <button class="inc-type-btn" data-type="blocked">🚧 Road Blocked</button>
           </div>
           <textarea id="inc-desc-input" class="inc-desc" rows="2" placeholder="Add details (optional)..."></textarea>
+          <div class="photo-row">
+            <button id="photo-capture-btn" type="button">📷 Add Photo</button>
+            <img id="photo-preview" alt="preview"/>
+            <button id="photo-clear-btn" type="button">✕ Remove</button>
+            <input id="photo-file-input" type="file" accept="image/jpeg,image/png" style="display:none"/>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+            <button id="push-bell-btn" type="button">🔔 Notify me of nearby incidents</button>
+            <span id="battery-badge" class="battery-badge">🔋 Saver ON</span>
+          </div>
           <button id="report-btn">📢 Report at My Location</button>
         </div>
         <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;font-weight:700;">
-          Nearby Incidents (last 6 hrs)
+          Nearby Incidents · auto-expire after 6 hrs
         </div>
         <div id="incidents-list">
           <div class="empty-state" style="padding:16px 20px">
@@ -1012,6 +1036,10 @@ const STATE = {
   crashInterval: null,
   aiHistory: [],
   medid: null,
+  pendingPhotoB64: null,
+  batterySaver: false,
+  pushSubscription: null,
+  upvotedIncidents: new Set(JSON.parse(localStorage.getItem('roadsos_upvoted') || '[]')),
   selectedIncType: null,
   sheetExpanded: false,
   // Live tracking
@@ -1205,18 +1233,41 @@ async function doSearch() {
   const lon = parseFloat(document.getElementById('lon-input').value);
   if (isNaN(lat) || isNaN(lon)) { toast('Enter valid coordinates or tap 📍', 'error'); return; }
   STATE.lat = lat; STATE.lon = lon;
-  const radius = STATE.searchRadius;
+  const radius   = STATE.searchRadius;
   const excluded = STATE.activeCategories;
-  const cats = Object.keys(CATEGORY_META).filter(c => !excluded.has(c));
+  const allCats  = Object.keys(CATEGORY_META).filter(c => !excluded.has(c));
   const btn = document.getElementById('search-btn');
   btn.disabled = true; btn.textContent = '⏳ Searching...';
   clearMarkers();
-  try {
-    const url = `/api/search?lat=${lat}&lon=${lon}&radius=${radius}${cats.length ? '&categories=' + cats.join(',') : ''}`;
-    const res = await fetch(url);
+  document.getElementById('results-area').innerHTML = '';
+
+  // Progressive: high-priority categories first (hospitals, ambulance, police)
+  const PRIORITY_CATS = ['hospital','ambulance','police'];
+  const firstBatch = PRIORITY_CATS.filter(c => allCats.includes(c));
+  const restBatch  = allCats.filter(c => !PRIORITY_CATS.includes(c));
+
+  let allData = { lat, lon, radius, total: 0, results: {} };
+
+  async function fetchBatch(cats, label) {
+    if (!cats.length) return;
+    const url = `/api/search?lat=${lat}&lon=${lon}&radius=${radius}&categories=${cats.join(',')}`;
+    const res  = await fetch(url);
     const data = await res.json();
-    renderResults(data); renderMarkers(data);
-    toast(`Found ${data.total} services in ${radius}km radius`, 'success');
+    // Merge into allData
+    Object.assign(allData.results, data.results);
+    allData.total = Object.values(allData.results).reduce((s, v) => s + v.count, 0);
+    renderResults(allData);
+    renderMarkers(data);  // Only new markers
+    if (label === 'priority') {
+      btn.textContent = `⏳ Loading more… (${allData.total} found)`;
+    }
+  }
+
+  try {
+    await fetchBatch(firstBatch, 'priority');
+    toast(`Found ${allData.total} priority services — loading rest…`, 'success');
+    await fetchBatch(restBatch, 'rest');
+    toast(`Found ${allData.total} services in ${radius}km radius`, 'success');
     loadIncidents();
   } catch(e) {
     toast('Search failed. Check connection.', 'error');
@@ -1546,12 +1597,19 @@ document.getElementById('report-btn').addEventListener('click', async () => {
   if (!STATE.lat || !STATE.lon) { toast('Location not available', 'error'); return; }
   if (!STATE.selectedIncType) { toast('Select an incident type first', 'warn'); return; }
   const desc = document.getElementById('inc-desc-input').value.trim();
+  const body = {
+    lat: STATE.lat, lon: STATE.lon,
+    type: STATE.selectedIncType,
+    description: desc,
+  };
+  if (STATE.pendingPhotoB64) body.photo = STATE.pendingPhotoB64;
   try {
-    await fetch('/api/incidents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat: STATE.lat, lon: STATE.lon, type: STATE.selectedIncType, description: desc }) });
+    await fetch('/api/incidents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     toast('✅ Incident reported successfully', 'success');
     document.getElementById('inc-desc-input').value = '';
     document.querySelectorAll('.inc-type-btn').forEach(b => b.classList.remove('sel'));
     STATE.selectedIncType = null;
+    clearPhoto();
     loadIncidents();
   } catch(e) { toast('Failed to report incident', 'error'); }
 });
@@ -1572,7 +1630,39 @@ function renderIncidents(incidents) {
     list.innerHTML = '<div class="empty-state" style="padding:16px 20px"><p style="font-size:.75rem">No recent incidents reported near you.</p></div>';
     return;
   }
-  list.innerHTML = incidents.map(inc => `<div class="inc-card"><div class="inc-icon">${INC_ICONS[inc.type] || '⚠️'}</div><div class="inc-info"><div class="inc-type-label">${inc.type.charAt(0).toUpperCase() + inc.type.slice(1)}</div><div class="inc-meta">${inc.distance_km}km away · ${timeAgo(inc.reported_at)}</div>${inc.description ? `<div class="inc-desc-text">${inc.description}</div>` : ''}</div></div>`).join('');
+  list.innerHTML = incidents.map(inc => {
+    const voted   = STATE.upvotedIncidents.has(inc.id);
+    const photoEl = inc.photo_path
+      ? `<img class="inc-photo-thumb" src="/static/incident_photos/${inc.photo_path}" alt="incident photo" loading="lazy"/>`
+      : '';
+    return `<div class="inc-card" data-inc-id="${inc.id}">
+      <div class="inc-icon">${INC_ICONS[inc.type] || '⚠️'}</div>
+      <div class="inc-info" style="flex:1;min-width:0">
+        <div class="inc-type-label">${inc.type.charAt(0).toUpperCase() + inc.type.slice(1)}</div>
+        <div class="inc-meta">${inc.distance_km}km away · ${timeAgo(inc.reported_at)}</div>
+        ${inc.description ? `<div class="inc-desc-text">${inc.description}</div>` : ''}
+        ${photoEl}
+      </div>
+      <div class="inc-upvote">
+        <button class="inc-upvote-btn ${voted ? 'voted' : ''}" onclick="handleUpvote(${inc.id}, this)" title="Confirm this is still there">👆</button>
+        <span class="inc-upvote-count">${inc.upvotes || 0}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function handleUpvote(id, btn) {
+  if (STATE.upvotedIncidents.has(id)) { toast('Already confirmed', 'warn'); return; }
+  try {
+    const res = await fetch(`/api/incidents/${id}/upvote`, { method: 'POST' });
+    if (!res.ok) { toast('Could not upvote', 'error'); return; }
+    STATE.upvotedIncidents.add(id);
+    localStorage.setItem('roadsos_upvoted', JSON.stringify([...STATE.upvotedIncidents]));
+    btn.classList.add('voted');
+    const countEl = btn.closest('.inc-upvote').querySelector('.inc-upvote-count');
+    if (countEl) countEl.textContent = parseInt(countEl.textContent || 0) + 1;
+    toast('✅ Confirmed still active', 'success');
+  } catch(e) { toast('Upvote failed', 'error'); }
 }
 
 function timeAgo(isoStr) {
@@ -1581,6 +1671,149 @@ function timeAgo(isoStr) {
   if (diff < 60) return Math.floor(diff) + ' min ago';
   return Math.floor(diff/60) + 'h ago';
 }
+
+// ── Photo capture ─────────────────────────────────────────────────────────────
+
+function clearPhoto() {
+  STATE.pendingPhotoB64 = null;
+  const preview = document.getElementById('photo-preview');
+  const btn     = document.getElementById('photo-capture-btn');
+  const clr     = document.getElementById('photo-clear-btn');
+  if (preview) { preview.style.display='none'; preview.src=''; }
+  if (btn)     { btn.classList.remove('has-photo'); btn.textContent='📷 Add Photo'; }
+  if (clr)     { clr.style.display='none'; }
+  const fi = document.getElementById('photo-file-input');
+  if (fi) fi.value='';
+}
+
+document.getElementById('photo-capture-btn')?.addEventListener('click', () => {
+  document.getElementById('photo-file-input')?.click();
+});
+
+document.getElementById('photo-clear-btn')?.addEventListener('click', clearPhoto);
+
+document.getElementById('photo-file-input')?.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { toast('Photo must be under 5 MB', 'warn'); clearPhoto(); return; }
+  const reader = new FileReader();
+  reader.onload = ev => {
+    STATE.pendingPhotoB64 = ev.target.result; // data URI
+    const preview = document.getElementById('photo-preview');
+    const btn     = document.getElementById('photo-capture-btn');
+    const clr     = document.getElementById('photo-clear-btn');
+    if (preview) { preview.src = ev.target.result; preview.style.display='block'; }
+    if (btn)     { btn.classList.add('has-photo'); btn.textContent='✅ Photo ready'; }
+    if (clr)     { clr.style.display='inline'; }
+  };
+  reader.readAsDataURL(file);
+});
+
+// ── Battery saver mode ────────────────────────────────────────────────────────
+
+let TRACK_INTERVAL_MS = 10000; // default 10s
+
+async function initBatterySaver() {
+  if (!('getBattery' in navigator)) return;
+  const batt = await navigator.getBattery().catch(() => null);
+  if (!batt) return;
+  const badge = document.getElementById('battery-badge');
+  function check() {
+    const low = batt.level <= 0.2 && !batt.charging;
+    STATE.batterySaver = low;
+    TRACK_INTERVAL_MS  = low ? 30000 : 10000;
+    if (badge) {
+      badge.style.display = low ? 'inline' : 'none';
+      badge.className = 'battery-badge' + (low ? ' low' : '');
+      badge.textContent = low ? `🪫 Saver ON (${Math.round(batt.level*100)}%)` : '🔋 Saver ON';
+    }
+  }
+  check();
+  batt.addEventListener('levelchange',   check);
+  batt.addEventListener('chargingchange', check);
+}
+initBatterySaver();
+
+// ── Web Push notifications ────────────────────────────────────────────────────
+
+async function initPushNotifications() {
+  const btn = document.getElementById('push-bell-btn');
+  if (!btn || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    if (btn) btn.style.display = 'none';
+    return;
+  }
+
+  async function getVapidKey() {
+    const res  = await fetch('/api/push/vapid-public-key');
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.key;
+  }
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw     = atob(base64);
+    return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+  }
+
+  async function subscribe() {
+    const vapidKey = await getVapidKey();
+    if (!vapidKey) { toast('Push notifications not configured on server', 'warn'); return; }
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidKey),
+    });
+    const subJson = sub.toJSON();
+    await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(subJson),
+    });
+    STATE.pushSubscription = sub;
+    btn.classList.add('active');
+    btn.textContent = '🔔 Notifications ON';
+    toast('🔔 You'll be notified of serious nearby incidents', 'success');
+  }
+
+  async function unsubscribe() {
+    if (STATE.pushSubscription) {
+      await fetch('/api/push/unsubscribe', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ endpoint: STATE.pushSubscription.endpoint }),
+      });
+      await STATE.pushSubscription.unsubscribe();
+      STATE.pushSubscription = null;
+    }
+    btn.classList.remove('active');
+    btn.textContent = '🔔 Notify me of nearby incidents';
+  }
+
+  // Check existing subscription
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const existing = await reg.pushManager.getSubscription();
+    if (existing) {
+      STATE.pushSubscription = existing;
+      btn.classList.add('active');
+      btn.textContent = '🔔 Notifications ON';
+    }
+  } catch(_) {}
+
+  btn.addEventListener('click', async () => {
+    const perm = Notification.permission;
+    if (STATE.pushSubscription) { await unsubscribe(); return; }
+    if (perm === 'denied') { toast('Notifications blocked in browser settings', 'warn'); return; }
+    if (perm === 'default') {
+      const result = await Notification.requestPermission();
+      if (result !== 'granted') { toast('Notification permission denied', 'warn'); return; }
+    }
+    await subscribe().catch(e => toast('Could not enable notifications', 'error'));
+  });
+}
+initPushNotifications();
 
 function loadMedicalID() {
   try {
@@ -1840,7 +2073,7 @@ async function toggleLiveTrack() {
     document.getElementById('live-track-btn-label').textContent = 'Stop Track';
     document.getElementById('live-track-indicator').classList.add('active');
 
-    // Send position updates every 30s
+    // Send position updates — interval adapts to battery saver mode
     STATE.trackInterval = setInterval(async () => {
       if (!STATE.trackToken || !STATE.lat || !STATE.lon) return;
       try {
@@ -1850,7 +2083,7 @@ async function toggleLiveTrack() {
           body: JSON.stringify({ lat: STATE.lat, lon: STATE.lon })
         });
       } catch(e) {}
-    }, 30000);
+    }, TRACK_INTERVAL_MS);
   } catch(e) {
     toast('Failed to start live tracking', 'error');
   }
