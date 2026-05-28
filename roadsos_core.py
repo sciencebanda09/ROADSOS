@@ -3,6 +3,7 @@ import sqlite3
 import json
 import math
 import os
+import secrets
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 
@@ -13,7 +14,7 @@ OVERPASS_URLS = [
 ]
 DB_PATH       = os.environ.get("ROADSOS_DB", "roadsos.db")
 CACHE_TTL_HRS = 24
-USER_AGENT    = "ROADSOS/3.0.0 (emergency-services-locator)"
+USER_AGENT    = "ROADSOS/3.1.0 (emergency-services-locator)"
 
 SERVICE_QUERIES: Dict[str, List[tuple]] = {
     "hospital": [
@@ -239,9 +240,21 @@ def init_db(db_path=DB_PATH):
             active      INTEGER DEFAULT 1
         )
     """)
+    # Live tracking table — expires after 2 hrs
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS live_tracks (
+            token       TEXT PRIMARY KEY,
+            lat         REAL NOT NULL,
+            lon         REAL NOT NULL,
+            created_at  TEXT NOT NULL,
+            updated_at  TEXT NOT NULL,
+            active      INTEGER DEFAULT 1
+        )
+    """)
 
+    # FIX #1: India ambulance corrected to "108"
     seed = [
-        ("IN","India",             "100",   "102/108","101",  "112"),
+        ("IN","India",             "100",   "108",    "101",  "112"),
         ("US","United States",     "911",   "911",    "911",  "911"),
         ("GB","United Kingdom",    "999",   "999",    "999",  "112"),
         ("AU","Australia",         "000",   "000",    "000",  "000"),
@@ -278,7 +291,6 @@ def init_db(db_path=DB_PATH):
         ("PH","Philippines",       "117",   "911",    "911",  "911"),
         ("VN","Vietnam",           "113",   "115",    "114",  "113"),
         ("KR","South Korea",       "112",   "119",    "119",  "112"),
-        ("NG","Nigeria",           "112",   "112",    "112",  "112"),
         ("GH","Ghana",             "191",   "193",    "192",  "112"),
         ("ET","Ethiopia",          "911",   "907",    "939",  "911"),
         ("TZ","Tanzania",          "112",   "114",    "115",  "112"),
@@ -307,11 +319,14 @@ def init_db(db_path=DB_PATH):
         ("KW","Kuwait",            "112",   "112",    "112",  "112"),
     ]
     c.executemany("INSERT OR IGNORE INTO emergency_numbers VALUES (?,?,?,?,?,?)", seed)
+    # Update India ambulance to fix existing DBs
+    c.execute("UPDATE emergency_numbers SET ambulance='108' WHERE country_code='IN'")
 
     c.execute("CREATE INDEX IF NOT EXISTS idx_svc_region   ON services(region_key, category)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_svc_latlon   ON services(lat, lon)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_svc_category ON services(category)")
     c.execute("CREATE INDEX IF NOT EXISTS idx_inc_latlon   ON incidents(lat, lon)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_tracks_token ON live_tracks(token)")
 
     conn.commit()
     conn.close()
@@ -524,6 +539,61 @@ def get_incidents(lat, lon, radius_km=5.0, db_path=DB_PATH):
                 "description":r[4],"reported_at":r[5],"distance_km":round(dist,2)
             })
     return sorted(results, key=lambda x: x["distance_km"])
+
+
+# ── Live tracking helpers ──────────────────────────────────────────────────────
+
+def create_track(lat, lon, db_path=DB_PATH):
+    """Create a new tracking token. Returns the token string."""
+    token = secrets.token_urlsafe(16)
+    now   = datetime.now().isoformat()
+    conn  = sqlite3.connect(db_path)
+    conn.execute(
+        "INSERT INTO live_tracks (token,lat,lon,created_at,updated_at,active) VALUES (?,?,?,?,?,1)",
+        (token, lat, lon, now, now)
+    )
+    conn.commit()
+    conn.close()
+    return token
+
+
+def update_track(token, lat, lon, db_path=DB_PATH):
+    """Update position for an active, non-expired token. Returns True on success."""
+    expiry = (datetime.now() - timedelta(hours=2)).isoformat()
+    now    = datetime.now().isoformat()
+    conn   = sqlite3.connect(db_path)
+    cur    = conn.execute(
+        "UPDATE live_tracks SET lat=?,lon=?,updated_at=? "
+        "WHERE token=? AND active=1 AND created_at > ?",
+        (lat, lon, now, token, expiry)
+    )
+    conn.commit()
+    ok = cur.rowcount > 0
+    conn.close()
+    return ok
+
+
+def get_track(token, db_path=DB_PATH):
+    """Return track data dict or None if not found/expired."""
+    expiry = (datetime.now() - timedelta(hours=2)).isoformat()
+    conn   = sqlite3.connect(db_path)
+    row    = conn.execute(
+        "SELECT lat,lon,updated_at,created_at FROM live_tracks "
+        "WHERE token=? AND active=1 AND created_at > ?",
+        (token, expiry)
+    ).fetchone()
+    conn.close()
+    if row:
+        return {"lat": row[0], "lon": row[1], "updated_at": row[2], "created_at": row[3]}
+    return None
+
+
+def delete_track(token, db_path=DB_PATH):
+    """Deactivate a tracking session."""
+    conn = sqlite3.connect(db_path)
+    conn.execute("UPDATE live_tracks SET active=0 WHERE token=?", (token,))
+    conn.commit()
+    conn.close()
 
 
 def get_first_aid(injury_type=None):
