@@ -6,7 +6,10 @@
 ## Screenshots
 
 ### Home Interface
-![Home](screenshots/home.png)
+![Home](screenshots/Home.png)
+
+### Emergency Services Search
+![Services](screenshots/services.png)
 
 ### AI Emergency Guide
 ![AI Guide](screenshots/ai-guide.png)
@@ -16,9 +19,6 @@
 
 ### Incident Reporting
 ![Incidents](screenshots/incidents.png)
-
-### Emergency Services Search
-![Services](screenshots/services.png)
 
 ### Loading Screen
 ![Loading](screenshots/loading.png)
