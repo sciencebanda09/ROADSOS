@@ -48,7 +48,7 @@
       --r: 16px;
       --r-sm: 10px;
       --r-lg: 22px;
-      --sheet-h: 62vh;
+      --sheet-h: 72vh;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -191,19 +191,21 @@
     #bottom-sheet.expanded { height: 92vh; }
     .sheet-handle-wrap {
       display: flex; justify-content: center; align-items: center;
-      padding: 10px 0 4px; cursor: pointer; flex-shrink: 0;
+      padding: 7px 0 3px; cursor: pointer; flex-shrink: 0;
     }
     .sheet-handle { width: 44px; height: 4px; background: var(--border2); border-radius: 2px; }
 
     /* ── LANGUAGE ROW ── */
     .panic-lang-row {
-      display: flex; gap: 6px; padding: 0 12px 8px; flex-wrap: wrap; flex-shrink: 0;
+      display: flex; gap: 5px; padding: 0 12px 6px;
+      overflow-x: auto; flex-shrink: 0; flex-wrap: nowrap;
     }
+    .panic-lang-row::-webkit-scrollbar { display: none; }
     .panic-lang-btn {
-      font-size: .68rem; font-weight: 700; padding: 5px 13px; border-radius: 20px;
+      font-size: .63rem; font-weight: 700; padding: 4px 11px; border-radius: 20px;
       border: 1.5px solid var(--border2); background: var(--card); color: var(--muted);
       cursor: pointer; transition: all .15s; font-family: var(--font);
-      min-height: 30px;
+      min-height: 26px; flex-shrink: 0;
     }
     .panic-lang-btn.active {
       background: var(--red-dim); color: var(--red); border-color: var(--red);
@@ -212,15 +214,15 @@
     /* ── 2×2 EMERGENCY GRID ── */
     .panic-grid {
       display: grid; grid-template-columns: 1fr 1fr;
-      gap: 9px; padding: 0 12px 8px; flex-shrink: 0;
+      gap: 7px; padding: 0 12px 6px; flex-shrink: 0;
     }
     .panic-btn {
-      border-radius: 16px; padding: 14px 10px;
+      border-radius: 13px; padding: 10px 8px;
       border: none; cursor: pointer;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 4px;
+      gap: 2px;
       transition: transform .12s, filter .12s;
-      min-height: 110px;
+      min-height: 86px;
       -webkit-tap-highlight-color: transparent;
       position: relative; overflow: hidden;
     }
@@ -231,10 +233,10 @@
     }
     .panic-btn:active { transform: scale(.94); filter: brightness(1.15); }
     .panic-btn:active::after { background: rgba(255,255,255,.06); }
-    .panic-btn .pb-icon { font-size: 1.9rem; line-height: 1; }
-    .panic-btn .pb-label { font-size: .78rem; font-weight: 700; text-align: center; line-height: 1.2; margin-top: 1px; }
-    .panic-btn .pb-num  { font-size: 1.55rem; font-weight: 900; letter-spacing: 2px; line-height: 1; font-family: var(--font-display); }
-    .panic-btn .pb-tap  { font-size: .58rem; font-weight: 600; opacity: .65; letter-spacing: .5px; text-transform: uppercase; }
+    .panic-btn .pb-icon { font-size: 1.55rem; line-height: 1; }
+    .panic-btn .pb-label { font-size: .7rem; font-weight: 700; text-align: center; line-height: 1.2; margin-top: 1px; }
+    .panic-btn .pb-num  { font-size: 1.35rem; font-weight: 900; letter-spacing: 2px; line-height: 1; font-family: var(--font-display); }
+    .panic-btn .pb-tap  { font-size: .54rem; font-weight: 600; opacity: .65; letter-spacing: .5px; text-transform: uppercase; }
     .pb-ambulance { background: linear-gradient(145deg, rgba(255,45,85,.22), rgba(255,45,85,.1)); color: #ff7a96; border: 1.5px solid rgba(255,45,85,.35); }
     .pb-police    { background: linear-gradient(145deg, rgba(50,210,255,.18), rgba(50,210,255,.07)); color: #5dd9ff; border: 1.5px solid rgba(50,210,255,.3); }
     .pb-fire      { background: linear-gradient(145deg, rgba(255,159,10,.2), rgba(255,159,10,.08)); color: #ffbc3d; border: 1.5px solid rgba(255,159,10,.35); }
@@ -247,49 +249,64 @@
     /* ── ACTION ROW ── */
     .panic-action-row {
       display: grid; grid-template-columns: 1fr 1fr;
-      gap: 8px; padding: 0 12px 6px; flex-shrink: 0;
+      gap: 7px; padding: 0 12px 5px; flex-shrink: 0;
     }
     .panic-share {
       border: none;
       background: rgba(213,0,249,.14); color: var(--purple);
-      border-radius: 14px; padding: 13px 10px;
+      border-radius: 12px; padding: 9px 10px;
       cursor: pointer; font-family: var(--font);
-      display: flex; align-items: center; justify-content: center; gap: 7px;
-      font-size: .78rem; font-weight: 700; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      font-size: .74rem; font-weight: 700; flex-shrink: 0;
       transition: opacity .15s, transform .12s;
       border: 1.5px solid rgba(191,90,242,.25);
-      min-height: 48px;
+      min-height: 40px;
     }
     .panic-share:active { transform: scale(.96); opacity: .85; }
     .panic-ai-btn {
       background: rgba(50,210,255,.12); color: var(--cyan);
       border: 1.5px solid rgba(50,210,255,.25);
-      border-radius: 14px; padding: 13px 10px;
+      border-radius: 12px; padding: 9px 10px;
       cursor: pointer; font-family: var(--font);
-      display: flex; align-items: center; justify-content: center; gap: 7px;
-      font-size: .78rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      font-size: .74rem; font-weight: 700;
       transition: opacity .15s, transform .12s;
-      min-height: 48px;
+      min-height: 40px;
     }
     .panic-ai-btn:active { transform: scale(.96); opacity: .85; }
 
     .panic-better-row {
-      display: flex; justify-content: center; padding: 0 12px 4px; flex-shrink: 0;
+      display: flex; justify-content: center; padding: 0 12px 3px; flex-shrink: 0;
     }
     .panic-better-link {
-      font-size: .62rem; color: var(--faint); background: none; border: none;
+      font-size: .58rem; color: var(--faint); background: none; border: none;
       cursor: pointer; text-decoration: underline; font-family: var(--font); font-weight: 600;
     }
     .panic-better-link:hover { color: var(--muted); }
 
-    /* ── SHEET TABS ── */
-    .sheet-tabs {
+    /* ── EXPAND HINT ── */
+    .sheet-expand-hint {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 14px 4px; flex-shrink: 0;
+    }
+    .sheet-expand-hint span {
+      font-size: .56rem; color: var(--faint); font-family: var(--font-mono);
+      letter-spacing: .5px; text-transform: uppercase;
+    }
+    .sheet-expand-btn {
+      background: var(--card); border: 1px solid var(--border2);
+      color: var(--muted); border-radius: 6px; padding: 3px 8px;
+      font-size: .58rem; font-weight: 700; letter-spacing: .4px;
+      cursor: pointer; transition: all .15s;
+    }
+    .sheet-expand-btn:hover { color: var(--text); border-color: var(--border2); }
+    #bottom-sheet.expanded .sheet-expand-btn { color: var(--red); border-color: rgba(255,45,85,.4); }
       display: flex; border-bottom: 1px solid var(--border);
       flex-shrink: 0; padding: 0 12px; gap: 4px;
     }
     .stab {
-      flex: 1; padding: 9px 4px;
-      font-size: .66rem; font-weight: 600; letter-spacing: .5px;
+      flex: 1; padding: 7px 4px;
+      font-size: .62rem; font-weight: 600; letter-spacing: .5px;
       color: var(--muted); text-align: center; text-transform: uppercase;
       border-bottom: 2px solid transparent;
       transition: all .2s;
@@ -303,8 +320,8 @@
     /* ── SEARCH PANE ── */
     #pane-search { gap: 0; }
     .search-controls {
-      padding: 10px 12px; border-bottom: 1px solid var(--border);
-      display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;
+      padding: 8px 12px; border-bottom: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;
     }
     .ctrl-row { display: flex; gap: 8px; align-items: center; }
     .field {
@@ -592,14 +609,15 @@
 
     /* ── RESPONSIVE ── */
     @media (min-width: 700px) {
-      :root { --sheet-h: 44vh; }
+      :root { --sheet-h: 52vh; }
       .inj-grid { grid-template-columns: repeat(4, 1fr); }
-      .panic-btn { min-height: 96px; }
+      .panic-btn { min-height: 86px; }
     }
     @media (max-width: 360px) {
-      .panic-btn .pb-num { font-size: 1.35rem; }
-      .panic-btn .pb-label { font-size: .72rem; }
+      .panic-btn .pb-num { font-size: 1.2rem; }
+      .panic-btn .pb-label { font-size: .66rem; }
       .logo { font-size: 1.65rem; }
+      .panic-btn { min-height: 80px; }
     }
   </style>
 </head>
@@ -731,6 +749,11 @@
       <button class="panic-better-link" id="plbl-better" onclick="showBetterService()">
         Service not responding? Find a better option →
       </button>
+    </div>
+
+    <div class="sheet-expand-hint">
+      <span>📋 SERVICES · FIRST AID · INCIDENTS</span>
+      <button class="sheet-expand-btn" id="sheet-expand-btn">⬆ EXPAND</button>
     </div>
 
     <div class="sheet-tabs">
@@ -1597,6 +1620,16 @@ document.querySelectorAll('.stab').forEach(tab => {
 document.getElementById('sheet-handle').addEventListener('click', () => {
   STATE.sheetExpanded = !STATE.sheetExpanded;
   document.getElementById('bottom-sheet').classList.toggle('expanded', STATE.sheetExpanded);
+  const btn = document.getElementById('sheet-expand-btn');
+  if (btn) btn.textContent = STATE.sheetExpanded ? '⬇ COLLAPSE' : '⬆ EXPAND';
+  map.invalidateSize();
+});
+
+document.getElementById('sheet-expand-btn').addEventListener('click', () => {
+  STATE.sheetExpanded = !STATE.sheetExpanded;
+  document.getElementById('bottom-sheet').classList.toggle('expanded', STATE.sheetExpanded);
+  const btn = document.getElementById('sheet-expand-btn');
+  btn.textContent = STATE.sheetExpanded ? '⬇ COLLAPSE' : '⬆ EXPAND';
   map.invalidateSize();
 });
 
