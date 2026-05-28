@@ -1,9 +1,9 @@
-// ROADSOS v3.0.0 Service Worker
-const CACHE_NAME = 'roadsos-v3';
+const CACHE_NAME = 'roadsos-v3.1.0-a7f3b2c';
 const STATIC_ASSETS = [
   '/',
   '/api/categories',
   '/api/firstaid',
+  '/api/version',
 ];
 
 self.addEventListener('install', e => {
@@ -27,7 +27,11 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // Network-first for live API calls
+  if (url.pathname.startsWith('/api/track') || url.pathname.startsWith('/track/')) {
+    e.respondWith(fetch(e.request));
+    return;
+  }
+
   if (url.pathname.startsWith('/api/search') || url.pathname.startsWith('/api/incidents')) {
     e.respondWith(
       fetch(e.request)
@@ -36,8 +40,8 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Cache-first for static + first aid
   if (url.pathname.startsWith('/api/firstaid') ||
+      url.pathname.startsWith('/api/version') ||
       url.pathname.startsWith('/static/') ||
       url.pathname === '/') {
     e.respondWith(
@@ -52,7 +56,6 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Default: network with cache fallback
   e.respondWith(
     fetch(e.request)
       .then(resp => {
