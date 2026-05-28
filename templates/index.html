@@ -118,8 +118,9 @@
       border: 1px solid var(--border);
       white-space: nowrap; flex-shrink: 0;
     }
-    #net-badge.online  { color: var(--green); border-color: rgba(16,185,129,.35); }
-    #net-badge.offline { color: var(--amber); border-color: rgba(245,158,11,.35); }
+    #net-badge.online     { color: var(--green);  border-color: rgba(16,185,129,.35); }
+    #net-badge.offline    { color: var(--amber);  border-color: rgba(245,158,11,.35); }
+    #net-badge.serverdown { color: var(--red);    border-color: rgba(244,63,94,.35); }
     #medid-topbtn {
       background: transparent; border: 1px solid var(--border2);
       color: var(--text2); font-size: .62rem; font-weight: 600;
@@ -520,6 +521,51 @@
     .toast.error   { background: var(--red-dim);   border-color: rgba(255,23,68,.4);   color: var(--red); }
     .toast.warn    { background: var(--amber-dim);  border-color: rgba(255,145,0,.4);  color: var(--amber); }
 
+    /* ── LIVE TRACK INDICATOR ── */
+    #live-track-indicator {
+      position: fixed; top: 64px; left: 14px; z-index: 450;
+      background: var(--red-dim); border: 1px solid rgba(244,63,94,.5);
+      border-radius: var(--r-sm); padding: 5px 12px;
+      font-size: .65rem; font-weight: 700; color: var(--red);
+      display: none; align-items: center; gap: 6px; letter-spacing: .4px;
+    }
+    #live-track-indicator.active { display: flex; }
+    #live-track-indicator .pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); animation: pulse-red 1.2s infinite; }
+    @keyframes pulse-red { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.3)} }
+
+    /* ── VOICE / TTS buttons ── */
+    #ai-mic-btn {
+      background: var(--card); color: var(--text2); border: 1px solid var(--border2);
+      border-radius: 50%; width: 44px; height: 44px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; transition: all .15s;
+    }
+    #ai-mic-btn.recording { background: var(--red-dim); border-color: var(--red); color: var(--red); animation: mic-pulse .8s infinite; }
+    #ai-mic-btn.hidden { display: none; }
+    @keyframes mic-pulse { 0%,100%{box-shadow:0 0 0 0 var(--red-glow)} 50%{box-shadow:0 0 0 8px rgba(244,63,94,0)} }
+    #tts-toggle {
+      background: transparent; border: 1px solid var(--border2); border-radius: var(--r-sm);
+      color: var(--muted); padding: 4px 10px; font-size: .65rem; font-weight: 600;
+      transition: all .15s; cursor: pointer; margin-left: auto;
+    }
+    #tts-toggle.on { color: var(--green); border-color: rgba(16,185,129,.4); background: var(--green-dim); }
+
+    /* ── LIVE TRACK BUTTON ── */
+    .panic-track-btn {
+      background: var(--card); color: var(--text2);
+      border-radius: var(--r-sm); padding: 7px 10px;
+      cursor: pointer; font-family: var(--font);
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      font-size: .7rem; font-weight: 600;
+      transition: background .1s, transform .1s;
+      border: 1px solid var(--border2);
+      min-height: 34px;
+    }
+    .panic-track-btn:active { transform: scale(.96); background: var(--card2); }
+    .panic-track-btn.tracking { background: var(--red-dim); border-color: var(--red); color: var(--red); }
+    .panic-track-btn::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); flex-shrink: 0; }
+    .panic-track-btn.tracking::before { background: var(--red); animation: pulse-red 1.2s infinite; }
+
     /* ── LOCATION PERMISSION ── */
     #loc-permission {
       position: fixed; bottom: calc(var(--sheet-h) + 12px); left: 50%;
@@ -672,6 +718,13 @@
 
   <div id="toast-wrap"></div>
 
+  <!-- Fix #9: Live track active indicator -->
+  <div id="live-track-indicator">
+    <div class="pulse-dot"></div>
+    <span id="live-track-label">LIVE TRACKING</span>
+    <button onclick="stopLiveTrack()" style="background:transparent;border:none;color:var(--red);font-size:.75rem;cursor:pointer;font-weight:700;padding:0 0 0 4px">✕ STOP</button>
+  </div>
+
   <div id="loc-permission">
     <div style="font-size:1.8rem">📍</div>
     <p>ROADSOS needs your location to find nearby emergency services.</p>
@@ -719,10 +772,14 @@
       </button>
     </div>
 
-    <div class="panic-action-row">
+    <div class="panic-action-row" style="grid-template-columns:1fr 1fr 1fr">
       <button class="panic-share" id="share-btn" onclick="broadcastLocation()">
         <span>📡</span>
         <span id="plbl-share">Share Location</span>
+      </button>
+      <button class="panic-track-btn" id="live-track-btn" onclick="toggleLiveTrack()">
+        <span>📍</span>
+        <span id="live-track-btn-label">Live Track</span>
       </button>
       <button class="panic-ai-btn" id="ai-btn">
         <span>🤖</span>
@@ -819,6 +876,7 @@
         <div class="ai-name">ROADSOS AI Guide</div>
         <div class="ai-status" id="ai-status">Emergency Guide · Free AI (Gemini)</div>
       </div>
+      <button id="tts-toggle" title="Toggle voice output">🔇 TTS</button>
       <button id="close-ai">✕</button>
     </div>
     <div class="ai-quick-prompts">
@@ -840,6 +898,7 @@
     </div>
     <div class="ai-input-row">
       <textarea id="ai-input" rows="1" placeholder="Describe the emergency..."></textarea>
+      <button id="ai-mic-btn" class="hidden" title="Voice input">🎤</button>
       <button id="ai-send">➤</button>
     </div>
   </div>
@@ -919,6 +978,14 @@
               <label class="medid-label">Contact 2 Phone</label>
               <input type="tel" id="mid-ec2-phone" class="medid-input" placeholder="+91 XXXXXX"/>
             </div>
+            <div class="medid-field">
+              <label class="medid-label">Contact 3 Name</label>
+              <input type="text" id="mid-ec3-name" class="medid-input" placeholder="Full name"/>
+            </div>
+            <div class="medid-field">
+              <label class="medid-label">Contact 3 Phone</label>
+              <input type="tel" id="mid-ec3-phone" class="medid-input" placeholder="+91 XXXXXX"/>
+            </div>
           </div>
         </div>
         <button id="save-medid">💾 Save Medical ID</button>
@@ -936,6 +1003,7 @@ const STATE = {
   searchRadius: 5,
   activeCategories: new Set(),
   markerLayers: {},
+  incidentMarkers: null,
   selectedSvc: null,
   goldenTimerActive: false,
   goldenTimerInterval: null,
@@ -946,6 +1014,11 @@ const STATE = {
   medid: null,
   selectedIncType: null,
   sheetExpanded: false,
+  // Live tracking
+  trackToken: null,
+  trackInterval: null,
+  // TTS
+  ttsEnabled: false,
 };
 
 const CATEGORY_META = {{ categories | tojson }};
@@ -1198,7 +1271,7 @@ function renderResults(data) {
       const distClass = svc.distance_km < 2 ? 'near' : svc.distance_km < 5 ? 'mid' : 'far';
       const card = document.createElement('div');
       card.className = 'svc-card';
-      card.innerHTML = `<div class="svc-top"><div class="svc-name">${svc.name}</div><div class="svc-dist ${distClass}">${svc.distance_km}km</div></div>${svc.address ? `<div class="svc-addr">${svc.address}</div>` : ''}<div class="svc-actions">${svc.phone ? `<button class="svc-btn call" onclick="window.location='tel:${svc.phone}'">📞 ${svc.phone}</button>` : ''}<button class="svc-btn nav" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${svc.lat},${svc.lon}','_blank')">🗺️ Navigate</button><button class="svc-btn share" onclick="shareService('${encodeURIComponent(svc.name)}',${svc.lat},${svc.lon})">↗ Share</button></div>`;
+      card.innerHTML = `<div class="svc-top"><div class="svc-name">${svc.name}</div><div class="svc-dist ${distClass}">${svc.distance_km}km</div></div>${svc.address ? `<div class="svc-addr">${svc.address}</div>` : ''}<div class="svc-actions">${svc.phone ? `<button class="svc-btn call" onclick="window.location='tel:${svc.phone}'">📞 ${svc.phone}</button>` : ''}<button class="svc-btn nav" onclick="navigateTo(${svc.lat},${svc.lon})">🗺️ Navigate</button><button class="svc-btn share" onclick="shareService('${encodeURIComponent(svc.name)}',${svc.lat},${svc.lon})">↗ Share</button></div>`;
       card.addEventListener('click', (e) => {
         if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
         map.setView([svc.lat, svc.lon], 16, { animate: true });
@@ -1315,15 +1388,48 @@ function updatePanicNumbers() {
 async function broadcastLocation() {
   if (!STATE.lat || !STATE.lon) { toast('Location not available yet', 'warn'); return; }
   const mapsLink = `https://maps.google.com/?q=${STATE.lat},${STATE.lon}`;
-  const waMsg = encodeURIComponent(`🚨 ROAD ACCIDENT — Need Emergency Help!\n\n📍 My Location: ${mapsLink}\n\nPlease call 108 or 112 immediately!\n\n[Sent via ROADSOS Emergency App]`);
+  const trackLink = STATE.trackToken ? `\n📍 Live Track: ${location.origin}/track/${STATE.trackToken}` : '';
+  const msg = `🚨 ROAD ACCIDENT — Need Emergency Help!\n\n📍 My Location: ${mapsLink}${trackLink}\n\nPlease call 108 or 112 immediately!\n\n[Sent via ROADSOS Emergency App]`;
+  const waMsg = encodeURIComponent(msg);
+
+  // Build WhatsApp links for saved contacts
+  const contacts = getEmergencyContacts();
+  const waLinks = contacts
+    .filter(c => c.phone)
+    .map(c => ({ name: c.name, url: `https://wa.me/${c.phone.replace(/[^0-9]/g,'')}?text=${waMsg}` }));
+
+  if (waLinks.length > 0) {
+    // Show options: system share + individual WA links
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: '🚨 Emergency — Road Accident', text: msg, url: mapsLink });
+      } catch(e) {}
+    }
+    waLinks.forEach(c => {
+      setTimeout(() => window.open(c.url, '_blank'), 200);
+    });
+    toast(`📡 Sent to ${waLinks.length} emergency contact(s)`, 'success');
+    return;
+  }
+
   if (navigator.share) {
     try {
-      await navigator.share({ title: '🚨 Emergency — Road Accident', text: `ROAD ACCIDENT. Need Help! Location: ${mapsLink}`, url: mapsLink });
+      await navigator.share({ title: '🚨 Emergency — Road Accident', text: msg, url: mapsLink });
       return;
     } catch(e) {}
   }
   window.open(`https://wa.me/?text=${waMsg}`, '_blank');
   toast('📡 Location broadcast sent via WhatsApp', 'success');
+}
+
+function getEmergencyContacts() {
+  if (!STATE.medid) return [];
+  const m = STATE.medid;
+  return [
+    { name: m.ec1name, phone: m.ec1phone },
+    { name: m.ec2name, phone: m.ec2phone },
+    { name: m.ec3name, phone: m.ec3phone },
+  ].filter(c => c.name || c.phone);
 }
 
 function shareService(name, lat, lon) {
@@ -1456,6 +1562,7 @@ async function loadIncidents() {
     const res = await fetch(`/api/incidents?lat=${STATE.lat}&lon=${STATE.lon}&radius=10`);
     const data = await res.json();
     renderIncidents(data.incidents || []);
+    loadIncidentMarkers();
   } catch(e) {}
 }
 
@@ -1487,7 +1594,7 @@ function renderMedIDDisplay() {
   const m = STATE.medid;
   const display = document.getElementById('medid-display');
   display.style.display = 'block';
-  display.innerHTML = `<div class="medid-display">${m.name ? `<div class="medid-row"><span class="medid-key">Name</span><span class="medid-val">${m.name}</span></div>` : ''}${m.blood ? `<div class="medid-row"><span class="medid-key">Blood Type</span><span class="medid-val blood">${m.blood}</span></div>` : ''}${m.dob ? `<div class="medid-row"><span class="medid-key">DOB</span><span class="medid-val">${m.dob}</span></div>` : ''}${m.weight ? `<div class="medid-row"><span class="medid-key">Weight</span><span class="medid-val">${m.weight} kg</span></div>` : ''}${m.allergies ? `<div class="medid-row"><span class="medid-key">Allergies</span><span class="medid-val" style="color:var(--red)">${m.allergies}</span></div>` : ''}${m.conditions ? `<div class="medid-row"><span class="medid-key">Conditions</span><span class="medid-val">${m.conditions}</span></div>` : ''}${m.meds ? `<div class="medid-row"><span class="medid-key">Medications</span><span class="medid-val">${m.meds}</span></div>` : ''}${m.ec1name ? `<div class="medid-row"><span class="medid-key">Emergency 1</span><span class="medid-val"><a href="tel:${m.ec1phone}" style="color:var(--cyan)">${m.ec1name} · ${m.ec1phone}</a></span></div>` : ''}${m.ec2name ? `<div class="medid-row"><span class="medid-key">Emergency 2</span><span class="medid-val"><a href="tel:${m.ec2phone}" style="color:var(--cyan)">${m.ec2name} · ${m.ec2phone}</a></span></div>` : ''}</div><button onclick="editMedID()" style="background:var(--card);border:1px solid var(--border2);color:var(--text);border-radius:var(--r-sm);padding:10px 20px;font-size:.82rem;font-weight:600;width:100%;margin-bottom:12px">✏️ Edit Medical ID</button>`;
+  display.innerHTML = `<div class="medid-display">${m.name ? `<div class="medid-row"><span class="medid-key">Name</span><span class="medid-val">${m.name}</span></div>` : ''}${m.blood ? `<div class="medid-row"><span class="medid-key">Blood Type</span><span class="medid-val blood">${m.blood}</span></div>` : ''}${m.dob ? `<div class="medid-row"><span class="medid-key">DOB</span><span class="medid-val">${m.dob}</span></div>` : ''}${m.weight ? `<div class="medid-row"><span class="medid-key">Weight</span><span class="medid-val">${m.weight} kg</span></div>` : ''}${m.allergies ? `<div class="medid-row"><span class="medid-key">Allergies</span><span class="medid-val" style="color:var(--red)">${m.allergies}</span></div>` : ''}${m.conditions ? `<div class="medid-row"><span class="medid-key">Conditions</span><span class="medid-val">${m.conditions}</span></div>` : ''}${m.meds ? `<div class="medid-row"><span class="medid-key">Medications</span><span class="medid-val">${m.meds}</span></div>` : ''}${m.ec1name ? `<div class="medid-row"><span class="medid-key">Emergency 1</span><span class="medid-val"><a href="tel:${m.ec1phone}" style="color:var(--cyan)">${m.ec1name} · ${m.ec1phone}</a></span></div>` : ''}${m.ec2name ? `<div class="medid-row"><span class="medid-key">Emergency 2</span><span class="medid-val"><a href="tel:${m.ec2phone}" style="color:var(--cyan)">${m.ec2name} · ${m.ec2phone}</a></span></div>` : ''}${m.ec3name ? `<div class="medid-row"><span class="medid-key">Emergency 3</span><span class="medid-val"><a href="tel:${m.ec3phone}" style="color:var(--cyan)">${m.ec3name} · ${m.ec3phone}</a></span></div>` : ''}</div><button onclick="editMedID()" style="background:var(--card);border:1px solid var(--border2);color:var(--text);border-radius:var(--r-sm);padding:10px 20px;font-size:.82rem;font-weight:600;width:100%;margin-bottom:12px">✏️ Edit Medical ID</button>`;
   document.getElementById('medid-form').style.display = 'none';
 }
 
@@ -1507,6 +1614,8 @@ function editMedID() {
     document.getElementById('mid-ec1-phone').value  = m.ec1phone || '';
     document.getElementById('mid-ec2-name').value   = m.ec2name || '';
     document.getElementById('mid-ec2-phone').value  = m.ec2phone || '';
+    document.getElementById('mid-ec3-name').value   = m.ec3name || '';
+    document.getElementById('mid-ec3-phone').value  = m.ec3phone || '';
   }
 }
 
@@ -1523,6 +1632,8 @@ document.getElementById('save-medid').addEventListener('click', () => {
     ec1phone:document.getElementById('mid-ec1-phone').value.trim(),
     ec2name: document.getElementById('mid-ec2-name').value.trim(),
     ec2phone:document.getElementById('mid-ec2-phone').value.trim(),
+    ec3name: document.getElementById('mid-ec3-name').value.trim(),
+    ec3phone:document.getElementById('mid-ec3-phone').value.trim(),
   };
   try {
     localStorage.setItem('roadsos_medid', JSON.stringify(medid));
@@ -1583,6 +1694,7 @@ function appendAIMessage(role, text) {
   div.innerHTML = `<div class="msg-bubble">${formatted}</div>`;
   document.getElementById('ai-messages').appendChild(div);
   scrollAIMessages();
+  if (role === 'assistant') speakText(text);
 }
 
 function scrollAIMessages() {
@@ -1637,16 +1749,37 @@ document.getElementById('grant-loc').addEventListener('click', locateMe);
 
 function updateNetBadge() {
   const badge = document.getElementById('net-badge');
-  if (navigator.onLine) {
-    badge.textContent = '● ONLINE'; badge.className = 'online';
-  } else {
+  if (!navigator.onLine) {
     badge.textContent = '⚠ OFFLINE'; badge.className = 'offline';
     toast('You are offline. Cached data will be used.', 'warn');
+  } else {
+    // Online — still check server health
+    checkServerHealth();
   }
 }
-window.addEventListener('online', updateNetBadge);
+
+async function checkServerHealth() {
+  const badge = document.getElementById('net-badge');
+  try {
+    const r = await fetch('/api/health', { cache: 'no-store' });
+    if (r.ok) {
+      badge.textContent = '● ONLINE'; badge.className = 'online';
+    } else {
+      badge.textContent = '⚠ SERVER DOWN'; badge.className = 'serverdown';
+    }
+  } catch(e) {
+    if (navigator.onLine) {
+      badge.textContent = '⚠ SERVER DOWN'; badge.className = 'serverdown';
+    } else {
+      badge.textContent = '⚠ OFFLINE'; badge.className = 'offline';
+    }
+  }
+}
+
+window.addEventListener('online',  updateNetBadge);
 window.addEventListener('offline', updateNetBadge);
 updateNetBadge();
+setInterval(checkServerHealth, 60000);
 
 function showEl(id, cls) { const el=document.getElementById(id); if(cls){el.classList.add(cls);}else{el.style.display='flex';} }
 function hideEl(id, cls) { const el=document.getElementById(id); if(cls){el.classList.remove(cls);}else{el.style.display='none';} }
@@ -1660,8 +1793,191 @@ function toast(msg, type='') {
   setTimeout(() => { div.style.opacity = '0'; div.style.transition = 'opacity .3s'; setTimeout(() => div.remove(), 300); }, 3000);
 }
 
+// ── Fix #13: Platform-aware navigation ────────────────────────────────────────
+function navigateTo(lat, lon) {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  if (isIOS) {
+    window.location.href = `https://maps.apple.com/?daddr=${lat},${lon}`;
+  } else {
+    // Try geo: URI first (opens native map apps on Android)
+    const geoUri = `geo:${lat},${lon}?q=${lat},${lon}`;
+    const fallback = `https://maps.google.com/?q=${lat},${lon}&navigate=yes`;
+    const a = document.createElement('a');
+    a.href = geoUri;
+    // geo: links don't work in desktop browsers — detect Android
+    if (/Android/.test(navigator.userAgent)) {
+      window.location.href = geoUri;
+    } else {
+      window.open(fallback, '_blank');
+    }
+  }
+}
+
+// ── Fix #9: Live Tracking ─────────────────────────────────────────────────────
+async function toggleLiveTrack() {
+  if (STATE.trackToken) { stopLiveTrack(); return; }
+  if (!STATE.lat || !STATE.lon) { toast('Location not available', 'warn'); return; }
+  try {
+    const res = await fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat: STATE.lat, lon: STATE.lon })
+    });
+    const data = await res.json();
+    STATE.trackToken = data.token;
+    const trackUrl = data.url;
+
+    // Copy to clipboard
+    try { await navigator.clipboard.writeText(trackUrl); } catch(e) {}
+
+    // Offer native share
+    if (navigator.share) {
+      navigator.share({ title: '📍 ROADSOS Live Track', url: trackUrl }).catch(()=>{});
+    }
+
+    toast('📍 Live tracking started — link copied!', 'success');
+    document.getElementById('live-track-btn').classList.add('tracking');
+    document.getElementById('live-track-btn-label').textContent = 'Stop Track';
+    document.getElementById('live-track-indicator').classList.add('active');
+
+    // Send position updates every 30s
+    STATE.trackInterval = setInterval(async () => {
+      if (!STATE.trackToken || !STATE.lat || !STATE.lon) return;
+      try {
+        await fetch(`/api/track/${STATE.trackToken}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat: STATE.lat, lon: STATE.lon })
+        });
+      } catch(e) {}
+    }, 30000);
+  } catch(e) {
+    toast('Failed to start live tracking', 'error');
+  }
+}
+
+function stopLiveTrack() {
+  if (!STATE.trackToken) return;
+  fetch(`/api/track/${STATE.trackToken}`, { method: 'DELETE' }).catch(()=>{});
+  clearInterval(STATE.trackInterval);
+  STATE.trackToken = null;
+  STATE.trackInterval = null;
+  document.getElementById('live-track-btn').classList.remove('tracking');
+  document.getElementById('live-track-btn-label').textContent = 'Live Track';
+  document.getElementById('live-track-indicator').classList.remove('active');
+  toast('📍 Live tracking stopped', 'warn');
+}
+
+// Keep location updated for live tracking
+function updateTrackPosition(lat, lon) {
+  STATE.lat = lat; STATE.lon = lon;
+}
+
+// ── Fix #10: Incident pins on map ─────────────────────────────────────────────
+async function loadIncidentMarkers() {
+  if (!STATE.lat || !STATE.lon) return;
+  // Remove existing incident layer
+  if (STATE.incidentMarkers) { map.removeLayer(STATE.incidentMarkers); STATE.incidentMarkers = null; }
+  try {
+    const res = await fetch(`/api/incidents?lat=${STATE.lat}&lon=${STATE.lon}&radius=10`);
+    const data = await res.json();
+    const incidents = data.incidents || [];
+    if (!incidents.length) return;
+
+    const group = L.layerGroup().addTo(map);
+    STATE.incidentMarkers = group;
+    const INC_COLORS = { accident:'#f43f5e', breakdown:'#8b5cf6', pothole:'#f59e0b', flood:'#06b6d4', debris:'#6b7280', blocked:'#f97316' };
+
+    for (const inc of incidents) {
+      const color = INC_COLORS[inc.type] || '#f59e0b';
+      const icon = L.divIcon({
+        html: `<div style="width:30px;height:30px;background:${color};border:2px solid rgba(255,255,255,.5);border-radius:6px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.5);font-size:14px">${INC_ICONS[inc.type]||'⚠️'}</div>`,
+        className:'', iconSize:[30,30], iconAnchor:[15,15], popupAnchor:[0,-16]
+      });
+      const marker = L.marker([inc.lat, inc.lon], { icon });
+      const timeStr = timeAgo(inc.reported_at);
+      marker.bindPopup(`<div><strong style="font-size:.85rem;color:${color}">${INC_ICONS[inc.type]||'⚠️'} ${inc.type.charAt(0).toUpperCase()+inc.type.slice(1)}</strong><br><span style="font-size:.72rem;color:var(--muted)">${inc.distance_km}km away · ${timeStr}</span>${inc.description ? `<br><span style="font-size:.7rem;color:var(--text)">${inc.description}</span>` : ''}</div>`, { maxWidth: 200 });
+      marker.addTo(group);
+    }
+  } catch(e) {}
+}
+
+// ── Fix #11: Voice Input + TTS ────────────────────────────────────────────────
+let ttsEnabled = false;
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+
+if (SpeechRecognition) {
+  document.getElementById('ai-mic-btn').classList.remove('hidden');
+  recognition = new SpeechRecognition();
+  recognition.lang = 'en-IN';
+  recognition.continuous = false;
+  recognition.interimResults = false;
+
+  recognition.onresult = (e) => {
+    const transcript = e.results[0][0].transcript;
+    document.getElementById('ai-input').value = transcript;
+    document.getElementById('ai-mic-btn').classList.remove('recording');
+    sendAIMessage(transcript);
+  };
+  recognition.onerror = () => {
+    document.getElementById('ai-mic-btn').classList.remove('recording');
+    toast('Voice input failed', 'warn');
+  };
+  recognition.onend = () => {
+    document.getElementById('ai-mic-btn').classList.remove('recording');
+  };
+}
+
+document.getElementById('ai-mic-btn').addEventListener('click', () => {
+  if (!recognition) return;
+  const btn = document.getElementById('ai-mic-btn');
+  if (btn.classList.contains('recording')) {
+    recognition.stop();
+    btn.classList.remove('recording');
+  } else {
+    btn.classList.add('recording');
+    recognition.start();
+  }
+});
+
+document.getElementById('tts-toggle').addEventListener('click', () => {
+  STATE.ttsEnabled = !STATE.ttsEnabled;
+  const btn = document.getElementById('tts-toggle');
+  btn.textContent = STATE.ttsEnabled ? '🔊 TTS' : '🔇 TTS';
+  btn.classList.toggle('on', STATE.ttsEnabled);
+  if (!STATE.ttsEnabled && window.speechSynthesis) window.speechSynthesis.cancel();
+  toast(STATE.ttsEnabled ? '🔊 Voice responses ON' : '🔇 Voice responses OFF', '');
+});
+
+function speakText(text) {
+  if (!STATE.ttsEnabled || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  // Strip markdown bold
+  const clean = text.replace(/\*\*(.*?)\*\*/g,'$1').replace(/\*/g,'');
+  const utt = new SpeechSynthesisUtterance(clean);
+  utt.lang = 'en-IN'; utt.rate = 1.0; utt.pitch = 1.0;
+  window.speechSynthesis.speak(utt);
+}
+
+// ── Fix #7: SW version check ──────────────────────────────────────────────────
+async function checkSWVersion() {
+  try {
+    const res = await fetch('/api/version', { cache: 'no-store' });
+    const data = await res.json();
+    const stored = localStorage.getItem('roadsos_version');
+    if (stored && stored !== data.version && 'serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) reg.update();
+      localStorage.setItem('roadsos_version', data.version);
+    } else if (!stored) {
+      localStorage.setItem('roadsos_version', data.version);
+    }
+  } catch(e) {}
+}
+
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/static/sw.js').catch(()=>{});
+  navigator.serviceWorker.register('/static/sw.js').then(() => checkSWVersion()).catch(()=>{});
 }
 
 function init() {
