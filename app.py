@@ -1,20 +1,41 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, Response
 from roadsos_core import (
     init_db, get_nearby_services, get_emergency_numbers, get_all_emergency_numbers,
     reverse_geocode, CATEGORY_INFO, SERVICE_QUERIES, DB_PATH,
-    report_incident, get_incidents, get_first_aid, FIRST_AID_DATA
+    report_incident, get_incidents, get_first_aid, FIRST_AID_DATA,
+    create_track, update_track, get_track, delete_track
 )
 import os
+import re
 import requests as req_lib
 from dotenv import load_dotenv
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
 load_dotenv()
 
 app = Flask(__name__)
 DB  = os.environ.get("ROADSOS_DB", DB_PATH)
 
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[],
+    storage_uri="memory://"
+)
+
+APP_VERSION = "3.1.0"
+
+ALLOWED_INC_TYPES = {"accident", "breakdown", "pothole", "flood", "debris", "blocked"}
+
+def strip_html(text: str) -> str:
+    """Remove HTML tags and strip whitespace."""
+    clean = re.sub(r'<[^>]+>', '', text)
+    return clean.strip()
+
+
 @app.route("/favicon.ico")
 def favicon():
-    from flask import Response
     svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="14" fill="#ff2d55"/><text x="16" y="21" text-anchor="middle" font-size="16" font-family="Arial" font-weight="bold" fill="white">S</text></svg>'
     return Response(svg, mimetype='image/svg+xml')
 
@@ -57,7 +78,9 @@ def api_search():
 @app.route("/api/emergency")
 def api_emergency():
     country = request.args.get("country", "IN")
-    return jsonify(get_emergency_numbers(country, DB))
+    resp = jsonify(get_emergency_numbers(country, DB))
+    resp.headers["Cache-Control"] = "public, max-age=86400"
+    return resp
 
 @app.route("/api/emergency/all")
 def api_emergency_all():
@@ -79,7 +102,6 @@ def api_categories():
 
 @app.route("/api/firstaid")
 def api_firstaid_all():
-    """Return all first aid topics (for offline caching)."""
     result = {}
     for key, data in FIRST_AID_DATA.items():
         result[key] = {
@@ -93,7 +115,6 @@ def api_firstaid_all():
 
 @app.route("/api/firstaid/<injury_type>")
 def api_firstaid(injury_type):
-    """Return detailed first aid steps for a specific injury."""
     data = get_first_aid(injury_type)
     if data is None:
         return jsonify({"error": "Unknown injury type"}), 404
@@ -110,21 +131,29 @@ def api_get_incidents():
     return jsonify({"incidents": get_incidents(lat, lon, radius, DB)})
 
 @app.route("/api/incidents", methods=["POST"])
+@limiter.limit("5 per hour")
 def api_report_incident():
     data = request.get_json()
     try:
         lat   = float(data["lat"])
         lon   = float(data["lon"])
-        itype = str(data["type"])
-        desc  = str(data.get("description",""))
+        itype = str(data["type"]).strip().lower()
+        desc  = str(data.get("description", ""))
     except (KeyError, TypeError, ValueError):
         return jsonify({"error": "lat, lon, type required"}), 400
+
+    # Fix #3: validate type
+    if itype not in ALLOWED_INC_TYPES:
+        return jsonify({"error": f"type must be one of: {', '.join(sorted(ALLOWED_INC_TYPES))}"}), 400
+
+    # Fix #3: sanitize and cap description
+    desc = strip_html(desc)[:300]
+
     report_incident(lat, lon, itype, desc, DB)
     return jsonify({"status": "reported"})
 
 @app.route("/api/share")
 def api_share():
-    """Generate a shareable emergency link with location."""
     try:
         lat = float(request.args["lat"])
         lon = float(request.args["lon"])
@@ -142,6 +171,121 @@ def api_share():
     })
 
 
+
+@app.route("/api/track", methods=["POST"])
+def api_create_track():
+    data = request.get_json() or {}
+    try:
+        lat = float(data["lat"])
+        lon = float(data["lon"])
+    except (KeyError, TypeError, ValueError):
+        return jsonify({"error": "lat and lon required"}), 400
+    token = create_track(lat, lon, DB)
+    track_url = f"{request.host_url}track/{token}"
+    return jsonify({"token": token, "url": track_url})
+
+
+@app.route("/api/track/<token>", methods=["GET"])
+def api_get_track(token):
+    track = get_track(token, DB)
+    if not track:
+        return jsonify({"error": "Track not found or expired"}), 404
+    return jsonify(track)
+
+
+@app.route("/api/track/<token>", methods=["PUT"])
+def api_update_track(token):
+    data = request.get_json() or {}
+    try:
+        lat = float(data["lat"])
+        lon = float(data["lon"])
+    except (KeyError, TypeError, ValueError):
+        return jsonify({"error": "lat and lon required"}), 400
+    ok = update_track(token, lat, lon, DB)
+    if not ok:
+        return jsonify({"error": "Track not found or expired"}), 404
+    return jsonify({"status": "updated"})
+
+
+@app.route("/api/track/<token>", methods=["DELETE"])
+def api_delete_track(token):
+    delete_track(token, DB)
+    return jsonify({"status": "stopped"})
+
+
+@app.route("/track/<token>")
+def view_track(token):
+    """Serve a minimal live-tracking page for a given token."""
+    track = get_track(token, DB)
+    if not track:
+        return "<h2 style='font-family:sans-serif;color:#888'>This tracking link has expired or is invalid.</h2>", 404
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>ROADSOS Live Track</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    *{{box-sizing:border-box;margin:0;padding:0}}
+    body{{background:#09090b;color:#f4f4f5;font-family:sans-serif;height:100dvh;display:flex;flex-direction:column}}
+    #header{{padding:12px 16px;background:#141418;border-bottom:1px solid #2a2a35;display:flex;align-items:center;gap:10px;flex-shrink:0}}
+    .logo{{font-size:1.2rem;font-weight:900;letter-spacing:1px}}
+    .logo em{{color:#f43f5e;font-style:normal}}
+    #status{{font-size:.75rem;color:#a1a1aa;margin-left:auto}}
+    #pulse{{width:8px;height:8px;border-radius:50%;background:#10b981;animation:pulse 1.5s infinite;flex-shrink:0}}
+    @keyframes pulse{{0%,100%{{box-shadow:0 0 0 0 rgba(16,185,129,.4)}}50%{{box-shadow:0 0 0 8px rgba(16,185,129,0)}}}}
+    #map{{flex:1}}
+    #footer{{padding:10px 16px;background:#141418;border-top:1px solid #2a2a35;font-size:.7rem;color:#71717a;text-align:center}}
+  </style>
+</head>
+<body>
+  <div id="header">
+    <div class="logo">ROAD<em>SOS</em></div>
+    <span>Live Track</span>
+    <div id="pulse"></div>
+    <span id="status">Connecting...</span>
+  </div>
+  <div id="map"></div>
+  <div id="footer">Updates every 20s · Expires 2hrs from creation · Powered by ROADSOS</div>
+  <script>
+    const TOKEN = {repr(token)};
+    const map = L.map('map').setView([{track['lat']}, {track['lon']}], 15);
+    L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',{{maxZoom:19}}).addTo(map);
+    map.getContainer().style.filter='saturate(.5) brightness(.6)';
+
+    const icon = L.divIcon({{
+      html:`<div style="width:22px;height:22px;background:#f43f5e;border:3px solid white;border-radius:50%;box-shadow:0 0 12px rgba(244,63,94,.6),0 0 0 8px rgba(244,63,94,.15)"></div>`,
+      className:'',iconSize:[22,22],iconAnchor:[11,11]
+    }});
+    let marker = L.marker([{track['lat']}, {track['lon']}],{{icon}}).addTo(map);
+
+    function refresh(){{
+      fetch('/api/track/'+TOKEN)
+        .then(r=>r.json())
+        .then(d=>{{
+          if(d.error){{ document.getElementById('pulse').style.background='#f59e0b'; document.getElementById('status').textContent='Tracking ended'; return; }}
+          marker.setLatLng([d.lat,d.lon]);
+          map.panTo([d.lat,d.lon]);
+          const ago = Math.round((Date.now()-new Date(d.updated_at+'Z').getTime())/1000);
+          document.getElementById('status').textContent = ago<5?'Just updated':`${ago}s ago`;
+        }}).catch(()=>{{ document.getElementById('status').textContent='Connection lost'; }});
+    }}
+    refresh();
+    setInterval(refresh, 20000);
+  </script>
+</body>
+</html>"""
+    return html
+
+
+@app.route("/api/version")
+def api_version():
+    return jsonify({"version": APP_VERSION})
+
+
 AI_SYSTEM = (
     "You are ROADSOS AI — an emergency guide inside a road accident response app used in India. "
     "Be CONCISE and CALM — the user may be panicking. Use numbered steps. Lead with the most "
@@ -152,11 +296,6 @@ AI_SYSTEM = (
 
 @app.route("/api/ai", methods=["POST"])
 def api_ai():
-    """
-    Free AI guide via Google Gemini 1.5 Flash.
-    Expects JSON: { "history": [{"role": "user"|"assistant", "content": "..."}] }
-    Returns JSON: { "reply": "..." }
-    """
     GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
     if not GEMINI_KEY:
         return jsonify({"error": "GEMINI_API_KEY not set"}), 503
@@ -191,7 +330,7 @@ def api_ai():
 
 @app.route("/api/health")
 def api_health():
-    return jsonify({"status": "ok", "version": "3.1.0"})
+    return jsonify({"status": "ok", "version": APP_VERSION})
 
 @app.route('/static/sw.js')
 def sw():
@@ -200,13 +339,6 @@ def sw():
 
 if __name__ == "__main__":
     init_db(DB)
-
     port = int(os.environ.get("PORT", 5000))
-
-    print(f"🚨 ROADSOS starting on port {port}")
-
-    app.run(
-        host="0.0.0.0",
-        port=port,
-        debug=False
-    )
+    print(f"🚨 ROADSOS v{APP_VERSION} starting on port {port}")
+    app.run(host="0.0.0.0", port=port, debug=False)
