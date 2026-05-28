@@ -1,12 +1,27 @@
 # 🚨 ROADSOS
-### Road Accident Emergency Services Locator — Next Generation
+### Road Accident Emergency Services Locator- Next Generation
 
-> The **life-saving** upgrade: crash detection, Golden Hour timer, AI emergency guide, Medical ID, and real-time location broadcast — all working offline.
+> The **life-saving** upgrade: crash detection, Golden Hour timer, AI emergency guide, Medical ID, and real-time location broadcast all working offline.
 
-[![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://python.org)
-[![Flask](https://img.shields.io/badge/Flask-3.x-green)](https://flask.palletsprojects.com)
-[![PWA](https://img.shields.io/badge/PWA-Ready-purple)](https://web.dev/progressive-web-apps/)
-[![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
+## Screenshots
+
+### Home Interface
+![Home](screenshots/home.png)
+
+### AI Emergency Guide
+![AI Guide](screenshots/ai-guide.png)
+
+### Medical ID
+![Medical ID](screenshots/medical-id.png)
+
+### Incident Reporting
+![Incidents](screenshots/incidents.png)
+
+### Emergency Services Search
+![Services](screenshots/services.png)
+
+### Loading Screen
+![Loading](screenshots/loading.png)
 
 ---
 
@@ -22,9 +37,17 @@ roadsos_v3/
 ├── static/
 │   ├── sw.js             ← Service worker (offline caching)
 │   └── manifest.json     ← PWA manifest with shortcuts
+├── screenshots/
+│   ├── home.png
+│   ├── ai-guide.png
+│   ├── medical-id.png
+│   ├── incidents.png
+│   ├── services.png
+│   └── loading.png
 ├── requirements.txt
-├── .env.example          ← Copy to .env and fill in your key
+├── .env.example
 └── README.md
+
 ```
 
 ---
