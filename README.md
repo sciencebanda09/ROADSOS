@@ -1,13 +1,13 @@
 <div align="center">
-
-```
-██████╗  ██████╗  █████╗ ██████╗ ███████╗ ██████╗ ███████╗
-██╔══██╗██╔═══██╗██╔══██╗██╔══██╗██╔════╝██╔═══██╗██╔════╝
-██████╔╝██║   ██║███████║██║  ██║███████╗██║   ██║███████╗
-██╔══██╗██║   ██║██╔══██║██║  ██║╚════██║██║   ██║╚════██║
-██║  ██║╚██████╔╝██║  ██║██████╔╝███████║╚██████╔╝███████║
-╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═════╝ ╚══════╝ ╚═════╝ ╚══════╝
-```
+  <pre style="font-size: 12px; line-height: 1.1; color: #ccc;">
+<span style="color: #ff3333;">██████╗ ██████╗ █████╗ ██████╗ </span><span style="color: #ffffff;">███████╗ ██████╗ ███████╗</span>
+<span style="color: #ff3333;">██╔══██╗██╔═══██╗██╔══██╗██╔══██╗</span><span style="color: #ffffff;">██╔════╝██╔═══██╗██╔════╝</span>
+<span style="color: #ff3333;">██████╔╝██║ ██║███████║██║ ██║</span><span style="color: #ffffff;">███████╗██║ ██║███████╗</span>
+<span style="color: #ff3333;">██╔══██╗██║ ██║██╔══██║██║ ██║</span><span style="color: #ffffff;">╚════██║██║ ██║╚════██║</span>
+<span style="color: #ff3333;">██║ ██║╚██████╔╝██║ ██║██████╔╝</span><span style="color: #ffffff;">███████║╚██████╔╝███████║</span>
+<span style="color: #ff3333;">╚═╝ ╚═╝ ╚═════╝ ╚═╝ ╚═╝╚═════╝ </span><span style="color: #ffffff;">╚══════╝ ╚═════╝ ╚══════╝</span>
+  </pre>
+</div>
 
 ### **Road Accident Emergency Services Locator**
 *Every second counts. ROADSOS finds help before you finish asking.*
