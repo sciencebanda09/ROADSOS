@@ -58,7 +58,7 @@ GEMINI_API_KEY=your_actual_key_here
 
 ```bash
 python app.py
-# Open http://127.0.0.1:5000
+
 ```
 
 > **No key?** The app still works fully — the AI Guide falls back to a built-in offline keyword-response system covering all major emergency scenarios (bleeding, CPR, burns, fractures, choking, shock, spinal injury, etc.).
