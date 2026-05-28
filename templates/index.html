@@ -1300,7 +1300,14 @@ function showSOSNumbers() { startGoldenHour(); }
 
 function updatePanicNumbers() {
   const nums = STATE.emergencyNums || {};
-  const setNum = (id, val) => { const el = document.getElementById(id); if(el && val) el.textContent = val; };
+  const setNum = (id, val) => {
+    const el = document.getElementById(id);
+    if (el && val) {
+      // Strip secondary numbers e.g. "102/108" → "108"
+      const clean = String(val).includes('/') ? String(val).split('/').pop().trim() : String(val);
+      el.textContent = clean;
+    }
+  };
   setNum('pnum-ambulance', nums.ambulance); setNum('pnum-police', nums.police);
   setNum('pnum-fire', nums.fire); setNum('pnum-hospital', nums.general);
 }
