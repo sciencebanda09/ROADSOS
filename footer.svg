@@ -1,0 +1,18 @@
+<svg viewBox="0 0 900 100" xmlns="http://www.w3.org/2000/svg" width="900" height="100">
+  <defs>
+    <pattern id="hazard" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="20" height="40" fill="#ff1744"/>
+      <rect x="20" width="20" height="40" fill="#1a0000"/>
+    </pattern>
+  </defs>
+  <rect width="900" height="100" fill="#0d0d0d"/>
+  <rect width="900" height="18" fill="url(#hazard)" opacity="0.85"/>
+  <rect x="0" y="18" width="6" height="82" fill="#ff1744"/>
+  <rect x="894" y="18" width="6" height="82" fill="#ff1744"/>
+  <text x="450" y="62" text-anchor="middle" dominant-baseline="middle"
+        font-family="'Courier New', Courier, monospace"
+        font-size="15" letter-spacing="4" fill="#888888">built by</text>
+  <text x="450" y="84" text-anchor="middle" dominant-baseline="middle"
+        font-family="'Courier New', Courier, monospace"
+        font-size="13" letter-spacing="3" fill="#ff6666">sciencebanda09</text>
+</svg>

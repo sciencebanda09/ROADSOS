@@ -1,0 +1,55 @@
+<svg viewBox="0 0 900 200" xmlns="http://www.w3.org/2000/svg" width="900" height="200">
+  <defs>
+    <pattern id="hazard" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="20" height="40" fill="#ff1744"/>
+      <rect x="20" width="20" height="40" fill="#1a0000"/>
+    </pattern>
+    <clipPath id="topStrip">
+      <rect width="900" height="20"/>
+    </clipPath>
+    <clipPath id="bottomStrip">
+      <rect y="180" width="900" height="20"/>
+    </clipPath>
+  </defs>
+
+  <!-- main background -->
+  <rect width="900" height="200" fill="#0d0d0d"/>
+
+  <!-- hazard stripe top bar -->
+  <rect width="900" height="22" fill="url(#hazard)" opacity="0.9"/>
+
+  <!-- hazard stripe bottom bar -->
+  <rect y="178" width="900" height="22" fill="url(#hazard)" opacity="0.9"/>
+
+  <!-- red left accent bar -->
+  <rect x="0" y="22" width="6" height="156" fill="#ff1744"/>
+
+  <!-- red right accent bar -->
+  <rect x="894" y="22" width="6" height="156" fill="#ff1744"/>
+
+  <!-- siren dot left -->
+  <circle cx="60" cy="100" r="14" fill="#ff1744" opacity="0.15"/>
+  <circle cx="60" cy="100" r="8" fill="#ff1744" opacity="0.4"/>
+  <circle cx="60" cy="100" r="4" fill="#ff1744"/>
+
+  <!-- siren dot right -->
+  <circle cx="840" cy="100" r="14" fill="#ff1744" opacity="0.15"/>
+  <circle cx="840" cy="100" r="8" fill="#ff1744" opacity="0.4"/>
+  <circle cx="840" cy="100" r="4" fill="#ff1744"/>
+
+  <!-- ROADSOS title -->
+  <text x="450" y="105" text-anchor="middle" dominant-baseline="middle"
+        font-family="'Courier New', Courier, monospace"
+        font-size="72" font-weight="900" letter-spacing="8"
+        fill="#ffffff">ROADSOS</text>
+
+  <!-- red underline -->
+  <rect x="180" y="126" width="540" height="3" rx="1.5" fill="#ff1744"/>
+
+  <!-- subtitle -->
+  <text x="450" y="152" text-anchor="middle"
+        font-family="'Courier New', Courier, monospace"
+        font-size="14" letter-spacing="3" fill="#ff6666">
+    ROAD ACCIDENT EMERGENCY SERVICES LOCATOR
+  </text>
+</svg>
