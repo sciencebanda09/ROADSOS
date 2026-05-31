@@ -1,28 +1,22 @@
 <div align="center">
 
-<pre style="font-family: monospace; font-size: 13px; line-height: 1.15; letter-spacing: 0.5px; display: inline-block; text-align: left;">
-<span style="color:#ff1744;">██████╗  ██████╗  █████╗ ██████╗ </span><span style="color:#ffffff;">███████╗ ██████╗ ███████╗</span>
-<span style="color:#ff1744;">██╔══██╗██╔═══██╗██╔══██╗██╔══██╗</span><span style="color:#ffffff;">██╔════╝██╔═══██╗██╔════╝</span>
-<span style="color:#ff1744;">██████╔╝██║   ██║███████║██║  ██║</span><span style="color:#ffffff;">███████╗██║   ██║███████╗</span>
-<span style="color:#ff1744;">██╔══██╗██║   ██║██╔══██║██║  ██║</span><span style="color:#ffffff;">╚════██║██║   ██║╚════██║</span>
-<span style="color:#ff1744;">██║  ██║╚██████╔╝██║  ██║██████╔╝</span><span style="color:#ffffff;">███████║╚██████╔╝███████║</span>
-<span style="color:#ff1744;">╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═════╝ </span><span style="color:#ffffff;">╚══════╝ ╚═════╝ ╚══════╝</span>
-</pre>
+```
+██████╗  ██████╗  █████╗ ██████╗ ███████╗ ██████╗ ███████╗
+██╔══██╗██╔═══██╗██╔══██╗██╔══██╗██╔════╝██╔═══██╗██╔════╝
+██████╔╝██║   ██║███████║██║  ██║███████╗██║   ██║███████╗
+██╔══██╗██║   ██║██╔══██║██║  ██║╚════██║██║   ██║╚════██║
+██║  ██║╚██████╔╝██║  ██║██████╔╝███████║╚██████╔╝███████║
+╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚═════╝ ╚══════╝ ╚═════╝ ╚══════╝
+```
 
-<br>
+### **Road Accident Emergency Services Locator**
+*Every second counts. ROADSOS finds help before you finish asking.*
 
-<p>
-  <strong style="font-size: 15px; letter-spacing: 2px; color: #ff1744;">ROAD ACCIDENT EMERGENCY SERVICES LOCATOR</strong><br>
-  <sub style="letter-spacing: 1px; color: #aaa;">Every second counts. ROADSOS finds help before you finish asking.</sub>
-</p>
-
-<br>
-
-[![Live Demo](https://img.shields.io/badge/LIVE_DEMO-roadsos--8ld0.onrender.com-ff1744?style=for-the-badge&logoColor=white)](https://roadsos-8ld0.onrender.com)
+[![Live Demo](https://img.shields.io/badge/🚨_LIVE_DEMO-roadsos--8ld0.onrender.com-ff1744?style=for-the-badge)](https://roadsos-8ld0.onrender.com)
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Flask](https://img.shields.io/badge/Flask-3.x-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com)
 [![PWA](https://img.shields.io/badge/PWA-Offline_Ready-5A0FC8?style=for-the-badge&logo=pwa&logoColor=white)](https://web.dev/progressive-web-apps/)
-[![License](https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge)](LICENSE)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
 </div>
 
@@ -42,13 +36,13 @@
 
 ## What is ROADSOS?
 
-When a road accident happens, the difference between life and death is measured in minutes. Victims and bystanders struggle to locate hospitals, ambulances, and police — especially in unfamiliar areas or low-connectivity zones.
+When a road accident happens, the difference between life and death is often measured in minutes. Victims and bystanders struggle to locate hospitals, ambulances, and police — especially in unfamiliar areas or low-connectivity zones.
 
 **ROADSOS** solves this with a single, fast, offline-capable app that:
 
 - Finds the **nearest trauma centres, ambulances, police, blood banks** and more in seconds
-- Delivers **AI-powered first aid guidance** via Claude, Gemini, or Groq — or offline as a fallback
-- **Broadcasts your live location** via a shareable link — over WhatsApp or SMS
+- Gives **AI-powered first aid guidance** via Claude, Gemini, or Groq — or offline as a fallback
+-  **Broadcasts your live location** via a shareable link — even over WhatsApp or SMS
 - Works across **60+ countries** with localised emergency numbers
 - Functions **fully offline** after first load — no network, no problem
 
@@ -57,66 +51,55 @@ When a road accident happens, the difference between life and death is measured 
 ## Features
 
 ### Crash Auto-Detection
+The app silently monitors your device accelerometer via the **DeviceMotion API**. A sudden impact above **20 m/s²** triggers a 10-second countdown overlay — tap *"I'm Okay"* to cancel, or let it auto-trigger the full SOS flow. Re-arms every 30 seconds. iOS 13+ asks for permission on first interaction.
 
-The app silently monitors your device accelerometer via the **DeviceMotion API**. A sudden impact above **20 m/s²** triggers a 10-second countdown overlay — tap *"I'm Okay"* to cancel, or let it auto-trigger the full SOS flow. Re-arms every 30 seconds. iOS 13+ prompts for permission on first interaction.
-
-### Golden Hour Timer
-
-An animated **60-minute countdown** starts the moment SOS is triggered — grounded in the clinical reality that trauma survival rates drop sharply after the first hour. Pulses red in the final 10 minutes.
+### ⏱ Golden Hour Timer
+An animated **60-minute countdown** starts the moment SOS is triggered — based on the clinical concept that trauma survival rates drop sharply after the first hour. Pulses red in the final 10 minutes to communicate urgency.
 
 ### AI Emergency Guide
-
-A conversational in-app assistant built for real emergencies. Powered by **Claude Haiku** (Anthropic) by default, with **Gemini 2.0 Flash** and **Llama 3.1 (Groq)** as fallbacks. API keys remain server-side — never exposed to the browser. Covers CPR, bleeding, fractures, burns, choking, shock, and spinal injury. Falls back **fully offline** to keyword-matched responses for 10 emergency types when there is no network.
+A conversational in-app assistant built for real emergencies. Powered by **Claude Haiku** (Anthropic) by default, with **Gemini 2.0 Flash** and **Llama 3.1 (Groq)** as fallbacks. API keys are kept server-side — never exposed to the browser. Covers CPR, bleeding, fractures, burns, choking, shock, and spinal injury. Falls back **fully offline** to keyword-matched responses for 10 emergency types when there's no network.
 
 ### Nearby Services — Progressive Loading
-
-Queries **OpenStreetMap** via the Overpass API across **10 service categories**. Critical categories (hospitals, ambulance, police) load and render **first** while the rest fetch in the background.
+Queries **OpenStreetMap** via the Overpass API across **10 service categories**. Critical categories (hospitals, ambulance, police) load and render **first** while the rest fetch in the background — so you see the most important results in seconds, not after everything loads.
 
 | # | Category | # | Category |
 |---|----------|---|----------|
-| 1 | Hospital / Trauma Centre | 6 | Blood Bank |
-| 2 | Ambulance Station | 7 | Fire Station |
-| 3 | Police Station | 8 | Pharmacy |
-| 4 | Towing / Car Repair | 9 | Fuel Station |
-| 5 | Puncture Shop | 10 | Car Service |
+| 🏥 | Hospital / Trauma Centre | 🩸 | Blood Bank |
+| 🚑 | Ambulance Station | 🚒 | Fire Station |
+| 👮 | Police Station | 💊 | Pharmacy |
+| 🔧 | Towing / Car Repair | ⛽ | Fuel Station |
+| 🔩 | Puncture Shop | 🚗 | Car Service |
 
 ### Medical ID
-
 Critical medical data stored **entirely in localStorage** — never sent to the server. Blood type, allergies (highlighted in red), conditions, medications, and **3 emergency contacts** with tap-to-call.
 
 ### Live Location Broadcast
-
 Generates a shareable live-tracking link that auto-refreshes and expires after **2 hours**. Also creates pre-filled **WhatsApp** and **SMS** messages with Google Maps coordinates. Automatically extends update interval in Battery Saver mode.
 
 ### Push Notifications
-
-Subscribe to nearby incident alerts. When a serious incident (accident, flood, road blocked) is reported near you, the server fires a **W3C Web Push** notification — even with the app in the background. Works on Android Chrome and desktop; iOS 16.4+ with the app added to Home Screen.
+Subscribe to nearby incident alerts. When a serious incident (accident, flood, road blocked) is reported near you, the server fires a **W3C Web Push** notification — even with the app in the background. Works on Android Chrome and desktop; iOS 16.4+ with app added to Home Screen.
 
 ### Community Incident Reports
-
-Report live road hazards — accidents, breakdowns, potholes, floods, debris, blocked roads. Attach photos, set expiry windows (1–48 hours), and upvote active incidents. Auto-expire cleans up stale reports automatically.
+Report live road hazards — accidents, breakdowns, potholes, floods, debris, blocked roads. Attach photos, set expiry windows (1–48 hours), and upvote active incidents. Auto-expire cleans up stale reports without manual effort.
 
 ### Battery Saver Mode
-
-Detected via the **Battery Status API**. When battery drops to 20% or below while unplugged, location update intervals extend from 10s to 30s. Reverts automatically when charging resumes.
+Detected automatically via the **Battery Status API**. When battery drops to ≤ 20% and unplugged, location update intervals extend from 10s to 30s and a badge appears. Reverts automatically when charging resumes.
 
 ### First Aid Knowledge Base
-
 Eight injury types with step-by-step guides — **fully available offline**: Severe Bleeding, CPR, Fracture, Burns, Head Injury, Choking, Shock, Spinal Injury.
 
 ### Hold-to-SOS Button
-
 Requires a **1.5-second hold** to prevent accidental activation. Reveals country-specific emergency numbers on trigger and starts the Golden Hour timer.
 
 ---
 
 ## Global Coverage
 
-Emergency numbers for **60+ countries** — police, ambulance, fire, and general emergency lines — baked directly into the SQLite database. Auto-detected from GPS coordinates via reverse geocoding.
+Emergency numbers for **60+ countries** — police, ambulance, fire, and general emergency lines — baked directly into the SQLite database. Auto-detected from your GPS coordinates via reverse geocoding.
 
 ```bash
-python cli.py --list-countries        # See all supported countries
-python cli.py --sos --country US      # Emergency numbers for any country
+python cli.py --list-countries   # See all supported countries
+python cli.py --sos --country US # Emergency numbers for any country
 ```
 
 ---
@@ -139,9 +122,9 @@ cp .env.example .env
 
 ```env
 # AI backend — pick one or all (Claude is recommended)
-ANTHROPIC_API_KEY=your_key_here      # https://console.anthropic.com
-GEMINI_API_KEY=your_key_here         # https://aistudio.google.com/app/apikey
-GROQ_API_KEY=your_key_here           # https://console.groq.com
+ANTHROPIC_API_KEY=your_key_here   # https://console.anthropic.com
+GEMINI_API_KEY=your_key_here      # https://aistudio.google.com/app/apikey
+GROQ_API_KEY=your_key_here        # https://console.groq.com
 
 # Push notifications (optional)
 VAPID_PRIVATE_KEY=your_vapid_private_key
@@ -149,10 +132,9 @@ VAPID_PUBLIC_KEY=your_vapid_public_key
 VAPID_MAILTO=mailto:you@example.com
 ```
 
-> **No API key?** The app works fully without one — the AI guide falls back to offline keyword matching, and push notifications are disabled.
+> **No API key?** The app works fully without one — AI guide falls back to offline keyword matching, push notifications are disabled.
 
 **Generate VAPID keys (one-time):**
-
 ```bash
 pip install py_vapid
 python -c "from py_vapid import Vapid; v=Vapid(); v.generate_keys(); print('VAPID_PRIVATE_KEY='+v.private_pem().decode().strip()); print('VAPID_PUBLIC_KEY='+v.public_key)"
@@ -163,6 +145,8 @@ python -c "from py_vapid import Vapid; v=Vapid(); v.generate_keys(); print('VAPI
 ```bash
 python app.py
 ```
+
+Open `http://localhost:5000` — that's it.
 
 ---
 
@@ -197,7 +181,7 @@ python cli.py --list-countries
 ## REST API
 
 | Method | Endpoint | Description |
-|:------:|----------|-------------|
+|--------|----------|-------------|
 | `GET` | `/api/search` | Nearby services (`lat`, `lon`, `radius`, `categories`) |
 | `GET` | `/api/emergency` | Emergency numbers by country code |
 | `GET` | `/api/emergency/all` | All 60+ countries |
@@ -238,17 +222,17 @@ Five SQLite tables — see [`schema.sql`](schema.sql) for the full export.
 
 ```
 ROADSOS/
-├── roadsos_core.py       -- Core engine: OSM queries, SQLite, haversine, first aid data
-├── app.py                -- Flask server: all REST endpoints
-├── cli.py                -- Colour terminal CLI
-├── schema.sql            -- Full database schema
+├── roadsos_core.py       ← Core engine: OSM queries, SQLite, haversine, first aid data
+├── app.py                ← Flask server — all REST endpoints
+├── cli.py                ← Colour terminal CLI
+├── schema.sql            ← Full database schema
 ├── templates/
-│   └── index.html        -- Mobile-first PWA frontend (single file, ~2500 lines)
+│   └── index.html        ← Mobile-first PWA frontend (single file, ~2500 lines)
 ├── static/
-│   ├── sw.js             -- Service worker: offline cache + push notifications
-│   └── manifest.json     -- PWA manifest with home screen shortcuts
-├── screenshots/          -- App screenshots for README
-├── .env.example          -- Environment variable template
+│   ├── sw.js             ← Service worker: offline cache + push notifications
+│   └── manifest.json     ← PWA manifest with home screen shortcuts
+├── screenshots/          ← App screenshots for README
+├── .env.example          ← Environment variable template
 ├── requirements.txt
 └── README.md
 ```
@@ -273,22 +257,14 @@ ROADSOS/
 
 ## Offline Behaviour
 
-On first load, ROADSOS fetches from OpenStreetMap and caches everything to SQLite. Subsequent requests within 24 hours are served from cache — no network needed. The service worker caches the shell, first aid data, category list, and Leaflet tiles. Emergency numbers and the first aid guide are **always** available offline, even on first install.
+On first load, ROADSOS fetches from OpenStreetMap and caches everything to SQLite. Subsequent requests within 24 hours are served directly from cache — no network needed. The service worker caches the shell, first aid data, category list, and Leaflet tiles. Emergency numbers and the first aid guide are **always** available offline, even on first install.
 
 ---
 
 <div align="center">
 
-<br>
+**Built for the golden hour. Designed for panic. Works without signal.**
 
-```
-Built for the golden hour.
-Designed for panic.
-Works without signal.
-```
-
-<br>
-
-<sub>Made with care for road safety in India and beyond</sub>
+*Made with ❤️ for road safety in India and beyond*
 
 </div>
